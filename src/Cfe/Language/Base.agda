@@ -46,4 +46,4 @@ fix : (Language → Language) → Language
 fix f l = ∃[ n ] iterate f n ∅ l
 
 _≤_ : Language → Language → Set (a ⊔ ℓ)
-A ≤ B = ∀ l → A l → B l
+A ≤ B = ∀ {l} → A l → B l
