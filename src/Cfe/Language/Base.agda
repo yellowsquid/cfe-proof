@@ -1,118 +1,163 @@
 {-# OPTIONS --without-K --safe #-}
 
-open import Relation.Binary
+open import Relation.Binary as B using (Setoid)
 
 module Cfe.Language.Base
-  {c ℓ} (setoid : Setoid c ℓ)
+  {c ℓ} (over : Setoid c ℓ)
   where
 
-open Setoid setoid renaming (Carrier to A)
+open Setoid over using () renaming (Carrier to C)
 
+open import Cfe.Relation.Indexed
 open import Data.Empty
 open import Data.List
-open import Data.List.Relation.Binary.Equality.Setoid setoid
-open import Data.Product as Product
-open import Function
-open import Level
+open import Data.List.Relation.Binary.Equality.Setoid over
+open import Data.Product
+open import Function hiding (Injection; Surjection; Inverse)
+import Function.Equality as Equality using (setoid)
+open import Level as L hiding (Lift)
+open import Relation.Binary.Indexed.Heterogeneous.Construct.Trivial as Trivial
 import Relation.Binary.PropositionalEquality as ≡
-import Relation.Binary.Indexed.Heterogeneous as I
+open import Relation.Binary.Indexed.Heterogeneous
 
-record IsLanguage {a aℓ} (𝕃 : List A → Set a) (_≈ᴸ_ : ∀ {l} → Rel (𝕃 l) aℓ) (⤖ : ∀ {l₁ l₂} → l₁ ≋ l₂ → 𝕃 l₁ → 𝕃 l₂) : Set (c ⊔ ℓ ⊔ a ⊔ aℓ) where
-  field
-    ≈ᴸ-isEquivalence : ∀ {l} → IsEquivalence (_≈ᴸ_ {l})
-    ⤖-cong : ∀ {l₁ l₂ l₁≋l₂} → (⤖ l₁≋l₂) Preserves _≈ᴸ_ {l₁} ⟶ _≈ᴸ_ {l₂}
-    ⤖-bijective : ∀ {l₁ l₂ l₁≋l₂} → Bijective (_≈ᴸ_ {l₁}) (_≈ᴸ_ {l₂}) (⤖ l₁≋l₂)
-    ⤖-refl : ∀ {l l∈𝕃} → (⤖ {l} ≋-refl l∈𝕃) ≈ᴸ l∈𝕃
-    ⤖-sym : ∀ {l₁ l₂ l₁∈𝕃 l₂∈𝕃 l₁≋l₂}
-          → (⤖ {l₁} l₁≋l₂ l₁∈𝕃) ≈ᴸ l₂∈𝕃
-          → (⤖ {l₂} (≋-sym l₁≋l₂) l₂∈𝕃) ≈ᴸ l₁∈𝕃
-    ⤖-trans : ∀ {l₁ l₂ l₃ l₁∈𝕃 l₂∈𝕃 l₃∈𝕃 l₁≋l₂ l₂≋l₃}
-            → (⤖ {l₁} l₁≋l₂ l₁∈𝕃) ≈ᴸ l₂∈𝕃
-            → (⤖ {l₂} l₂≋l₃ l₂∈𝕃) ≈ᴸ l₃∈𝕃
-            → (⤖ {_} {l₃} (≋-trans l₁≋l₂ l₂≋l₃) l₁∈𝕃) ≈ᴸ l₃∈𝕃
-
-  ≈ᴸ-refl : ∀ {l} → Reflexive (_≈ᴸ_ {l})
-  ≈ᴸ-refl = IsEquivalence.refl ≈ᴸ-isEquivalence
-
-  ≈ᴸ-sym : ∀ {l} → Symmetric (_≈ᴸ_ {l})
-  ≈ᴸ-sym = IsEquivalence.sym ≈ᴸ-isEquivalence
-
-  ≈ᴸ-trans : ∀ {l} → Transitive (_≈ᴸ_ {l})
-  ≈ᴸ-trans = IsEquivalence.trans ≈ᴸ-isEquivalence
-
-  ≈ᴸ-reflexive : ∀ {l} → ≡._≡_ ⇒ (_≈ᴸ_ {l})
-  ≈ᴸ-reflexive = IsEquivalence.reflexive ≈ᴸ-isEquivalence
-
-  ⤖-injective : ∀ {l₁ l₂ l₁≋l₂} → Injective (_≈ᴸ_ {l₁}) (_≈ᴸ_ {l₂}) (⤖ l₁≋l₂)
-  ⤖-injective = proj₁ ⤖-bijective
-
-  ⤖-surjective : ∀ {l₁ l₂ l₁≋l₂} → Surjective (_≈ᴸ_ {l₁}) (_≈ᴸ_ {l₂}) (⤖ {l₁} l₁≋l₂)
-  ⤖-surjective = proj₂ ⤖-bijective
-
-  ⤖-isIndexedEquivalence : I.IsIndexedEquivalence 𝕃 (λ l₁∈𝕃 l₂∈𝕃 → ∃[ l₁≋l₂ ] ((⤖ l₁≋l₂ l₁∈𝕃) ≈ᴸ l₂∈𝕃))
-  ⤖-isIndexedEquivalence = record
-    { refl = ≋-refl , ⤖-refl
-    ; sym = Product.map ≋-sym ⤖-sym
-    ; trans = Product.zip ≋-trans ⤖-trans
-    }
-
-  ⤖-reflexive : ∀ {l l∈𝕃 l∈𝕃′} → l∈𝕃 ≡.≡ l∈𝕃′ → ∃[ l≋l ]((⤖ {l} l≋l l∈𝕃) ≈ᴸ l∈𝕃′)
-  ⤖-reflexive = I.IsIndexedEquivalence.reflexive ⤖-isIndexedEquivalence
-
-record Language a aℓ : Set (c ⊔ ℓ ⊔ suc (a ⊔ aℓ)) where
-  infix 4 _≈ᴸ_
-  field
-    𝕃 : List A → Set a
-    _≈ᴸ_ : ∀ {l} → Rel (𝕃 l) aℓ
-    ⤖ : ∀ {l₁ l₂} → l₁ ≋ l₂ → 𝕃 l₁ → 𝕃 l₂
-    isLanguage : IsLanguage 𝕃 _≈ᴸ_ ⤖
-
-  open IsLanguage isLanguage public
-
-open Language
-
-infix 4 _∈_
-
-_∈_ : ∀ {a aℓ} → List A → Language a aℓ → Set a
-l ∈ A = 𝕃 A l
+Language : ∀ a aℓ → Set (suc c ⊔ suc a ⊔ suc aℓ)
+Language a aℓ = IndexedSetoid (List C) a aℓ
 
 ∅ : Language 0ℓ 0ℓ
-∅ = record
-  { 𝕃 = const ⊥
-  ; _≈ᴸ_ = ≡._≡_
-  ; ⤖ = const id
-  ; isLanguage = record
-    { ≈ᴸ-isEquivalence = ≡.isEquivalence
-    ; ⤖-cong = ≡.cong id
-    ; ⤖-bijective = (λ {x} → ⊥-elim x) , (λ ())
-    ; ⤖-refl = λ {_} {l∈𝕃} → ⊥-elim l∈𝕃
-    ; ⤖-sym = λ {_} {_} {l₁∈𝕃} → ⊥-elim l₁∈𝕃
-    ; ⤖-trans = λ {_} {_} {_} {l₁∈𝕃} → ⊥-elim l₁∈𝕃
+∅ = Trivial.indexedSetoid (≡.setoid ⊥)
+
+｛ε｝ : Language (c ⊔ ℓ) (c ⊔ ℓ)
+｛ε｝ = record
+  { Carrier = [] ≋_
+  ; _≈_ = λ {l₁} {l₂} []≋l₁ []≋l₂ → ∃[ l₁≋l₂ ] (≋-trans []≋l₁ l₁≋l₂ ≡.≡ []≋l₂)
+  ; isEquivalence = record
+    { refl = λ {_} {x} →
+      ≋-refl ,
+      ( case x return (λ x → ≋-trans x ≋-refl ≡.≡ x) of λ {[] → ≡.refl} )
+    ; sym = λ {_} {_} {x} {y} (z , _) →
+      ≋-sym z ,
+      ( case (x , y , z)
+        return (λ (x , y , z) → ≋-trans y (≋-sym z) ≡.≡ x)
+        of λ {([] , [] , []) → ≡.refl} )
+    ; trans = λ {_} {_} {_} {v} {w} {x} (y , _) (z , _) →
+      ≋-trans y z ,
+      ( case (v , w , x , y , z)
+        return (λ (v , _ , x , y , z) → ≋-trans v (≋-trans y z) ≡.≡ x)
+        of λ {([] , [] , [] , [] , []) → ≡.refl} )
     }
   }
 
-⦃ε⦄ : Language (c ⊔ ℓ) (c ⊔ ℓ)
-⦃ε⦄ = record
-  { 𝕃 = [] ≋_
-  ; _≈ᴸ_ = ≡._≡_
-  ; ⤖ = flip ≋-trans
-  ; isLanguage = record
-    { ≈ᴸ-isEquivalence = ≡.isEquivalence
-    ; ⤖-cong = λ {_} {_} {l₁≋l₂} → ≡.cong (flip ≋-trans l₁≋l₂)
-    ; ⤖-bijective = λ {_} {_} {l₁≋l₂} →
-                  ( (λ {x} {y} x≡y → case x , y return (λ (x , y) → x ≡.≡ y) of λ { ([] , []) → ≡.refl })
-                  , (λ { [] → (case l₁≋l₂ return (λ x → ∃[ y ](≋-trans y x ≡.≡ [])) of λ { [] → [] , ≡.refl})}))
-    ; ⤖-refl = λ {_} {[]≋l} → case []≋l return (λ []≋l → ≋-trans []≋l ≋-refl ≡.≡ []≋l) of λ {[] → ≡.refl}
-    ; ⤖-sym = λ {_} {_} {[]≋l₁} {[]≋l₂} {l₁≋l₂} _ →
-      case []≋l₁ , []≋l₂ , l₁≋l₂
-      return (λ ([]≋l₁ , []≋l₂ , l₁≋l₂) → ≋-trans []≋l₂ (≋-sym l₁≋l₂) ≡.≡ []≋l₁)
-      of λ { ([] , [] , []) → ≡.refl }
-    ; ⤖-trans = λ {_} {_} {_} {[]≋l₁} {[]≋l₂} {[]≋l₃} {l₁≋l₂} {l₂≋l₃} _ _ →
-      case []≋l₁ , []≋l₂ , []≋l₃ , l₁≋l₂ , l₂≋l₃
-      return (λ ([]≋l₁ , []≋l₂ , []≋l₃ , l₁≋l₂ , l₂≋l₃) → ≋-trans []≋l₁ (≋-trans l₁≋l₂ l₂≋l₃) ≡.≡ []≋l₃)
-      of λ { ([] , [] , [] , [] , []) → ≡.refl }
+Lift : ∀ {a aℓ} → (b bℓ : Level) → Language a aℓ → Language (a ⊔ b) (aℓ ⊔ bℓ)
+Lift b bℓ A = record
+  { Carrier = L.Lift b ∘ A.Carrier
+  ; _≈_ = λ (lift x) (lift y) → L.Lift bℓ (x A.≈ y)
+  ; isEquivalence = record
+    { refl = lift A.refl
+    ; sym = λ (lift x) → lift (A.sym x)
+    ; trans = λ (lift x) (lift y) → lift (A.trans x y)
+    }
+  }
+  where
+  module A = IndexedSetoid A
+
+𝕃 : ∀ {a aℓ} → Language a aℓ → List C → Set a
+𝕃 = IndexedSetoid.Carrier
+
+_∈_ : ∀ {a aℓ} → List C → Language a aℓ → Set a
+_∈_ = flip 𝕃
+
+≈ᴸ : ∀ {a aℓ} → (A : Language a aℓ) → ∀ {l₁ l₂} → 𝕃 A l₁ → 𝕃 A l₂ → Set aℓ
+≈ᴸ = IndexedSetoid._≈_
+
+≈ᴸ-refl : ∀ {a aℓ} → (A : Language a aℓ) → Reflexive (𝕃 A) (≈ᴸ A)
+≈ᴸ-refl = IsIndexedEquivalence.refl ∘ IndexedSetoid.isEquivalence
+
+≈ᴸ-sym : ∀ {a aℓ} → (A : Language a aℓ) → Symmetric (𝕃 A) (≈ᴸ A)
+≈ᴸ-sym = IsIndexedEquivalence.sym ∘ IndexedSetoid.isEquivalence
+
+≈ᴸ-trans : ∀ {a aℓ} → (A : Language a aℓ) → Transitive (𝕃 A) (≈ᴸ A)
+≈ᴸ-trans = IsIndexedEquivalence.trans ∘ IndexedSetoid.isEquivalence
+
+record _≤_ {a aℓ b bℓ} (A : Language a aℓ) (B : Language b bℓ) : Set (c ⊔ a ⊔ aℓ ⊔ b ⊔ bℓ) where
+  field
+    f : ∀ {l} → l ∈ A → l ∈ B
+    cong : ∀ {l₁ l₂ l₁∈A l₂∈A} → ≈ᴸ A {l₁} {l₂} l₁∈A l₂∈A → ≈ᴸ B (f l₁∈A) (f l₂∈A)
+
+record _≈_ {a aℓ b bℓ} (A : Language a aℓ) (B : Language b bℓ) : Set (c ⊔ ℓ ⊔ a ⊔ aℓ ⊔ b ⊔ bℓ) where
+  field
+    f : ∀ {l} → l ∈ A → l ∈ B
+    f⁻¹ : ∀ {l} → l ∈ B → l ∈ A
+    cong₁ : ∀ {l₁ l₂ l₁∈A l₂∈A} → ≈ᴸ A {l₁} {l₂} l₁∈A l₂∈A → ≈ᴸ B (f l₁∈A) (f l₂∈A)
+    cong₂ : ∀ {l₁ l₂ l₁∈B l₂∈B} → ≈ᴸ B {l₁} {l₂} l₁∈B l₂∈B → ≈ᴸ A (f⁻¹ l₁∈B) (f⁻¹ l₂∈B)
+
+≈-refl : ∀ {a aℓ} → B.Reflexive (_≈_ {a} {aℓ})
+≈-refl {x = A} = record
+  { f = id
+  ; f⁻¹ = id
+  ; cong₁ = id
+  ; cong₂ = id
+  }
+
+≈-sym : ∀ {a aℓ b bℓ} → B.Sym (_≈_ {a} {aℓ} {b} {bℓ}) _≈_
+≈-sym A≈B = record
+  { f = A≈B.f⁻¹
+  ; f⁻¹ = A≈B.f
+  ; cong₁ = A≈B.cong₂
+  ; cong₂ = A≈B.cong₁
+  }
+  where
+  module A≈B = _≈_ A≈B
+
+≈-trans : ∀ {a aℓ b bℓ c cℓ} → B.Trans (_≈_ {a} {aℓ}) (_≈_ {b} {bℓ} {c} {cℓ}) _≈_
+≈-trans {i = A} {B} {C} A≈B B≈C = record
+  { f = B≈C.f ∘ A≈B.f
+  ; f⁻¹ = A≈B.f⁻¹ ∘ B≈C.f⁻¹
+  ; cong₁ = B≈C.cong₁ ∘ A≈B.cong₁
+  ; cong₂ = A≈B.cong₂ ∘ B≈C.cong₂
+  }
+  where
+  module A≈B = _≈_ A≈B
+  module B≈C = _≈_ B≈C
+
+setoid : ∀ a aℓ → B.Setoid (suc (c ⊔ a ⊔ aℓ)) (c ⊔ ℓ ⊔ a ⊔ aℓ)
+setoid a aℓ = record
+  { Carrier = Language a aℓ
+  ; _≈_ = _≈_
+  ; isEquivalence = record
+    { refl = ≈-refl
+    ; sym = ≈-sym
+    ; trans = ≈-trans
     }
   }
 
-_≤_ : {a aℓ b bℓ : Level} → REL (Language a aℓ) (Language b bℓ) (c ⊔ a ⊔ b)
-A ≤ B = ∀ {l} → l ∈ A → l ∈ B
+≤-refl : ∀ {a aℓ} → B.Reflexive (_≤_ {a} {aℓ})
+≤-refl = record
+  { f = id
+  ; cong = id
+  }
+
+≤-trans : ∀ {a aℓ b bℓ c cℓ} → B.Trans (_≤_ {a} {aℓ}) (_≤_ {b} {bℓ} {c} {cℓ}) _≤_
+≤-trans A≤B B≤C = record
+  { f = B≤C.f ∘ A≤B.f
+  ; cong = B≤C.cong ∘ A≤B.cong
+  }
+  where
+  module A≤B = _≤_ A≤B
+  module B≤C = _≤_ B≤C
+
+≤-antisym : ∀ {a aℓ b bℓ} → B.Antisym (_≤_ {a} {aℓ} {b} {bℓ}) _≤_ _≈_
+≤-antisym A≤B B≤A = record
+  { f = A≤B.f
+  ; f⁻¹ = B≤A.f
+  ; cong₁ = A≤B.cong
+  ; cong₂ = B≤A.cong
+  }
+  where
+  module A≤B = _≤_ A≤B
+  module B≤A = _≤_ B≤A
+
+≤-min : ∀ {b bℓ} → B.Min (_≤_ {b = b} {bℓ}) ∅
+≤-min A = record
+  { f = λ ()
+  ; cong = λ {_} {_} {}
+  }
