@@ -7,3 +7,4 @@ module Cfe.Language
   where
 
 open import Cfe.Language.Base setoid public
+open import Cfe.Language.Properties setoid public
