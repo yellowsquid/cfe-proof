@@ -45,3 +45,26 @@ L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
   ; f⇒f = λ ()
   ; l⇒l = λ ()
   }
+
+L⊨τε⇒L≤｛ε｝ : ∀ {a aℓ} {L : Language a aℓ} → L ⊨ τε → L ≤ ｛ε｝
+L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
+  { f = λ {l} l∈L → elim l l∈L
+  ; cong = λ {l₁} {l₂} {l₁∈L} {l₂∈L} l₁≈l₂ → tt
+  }
+  where
+  open import Data.Unit
+  open import Relation.Binary.PropositionalEquality
+  module L⊨τε = _⊨_ L⊨τε
+
+  elim : ∀ l (l∈L : l ∈ L) → l ∈ ｛ε｝
+  elim [] []∈L = refl
+  elim (x ∷ l) xl∈L = ⊥-elim (L⊨τε.f⇒f (-, xl∈L))
+
+｛ε｝⊨τε : ｛ε｝ ⊨ τε
+｛ε｝⊨τε = record
+  { n⇒n = const tt
+  ; f⇒f = λ ()
+  ; l⇒l = λ { ([] , ()) ; (_ ∷ _ , ())}
+  }
+  where
+  open import Data.Unit
