@@ -53,3 +53,19 @@ record _⊨_ {a} {aℓ} {fℓ} {lℓ} (A : Language a aℓ) (τ : Type fℓ lℓ
     n⇒n : null A → T (Null τ)
     f⇒f : first A ⊆ First τ
     l⇒l : flast A ⊆ Flast τ
+
+record _⊛_ {fℓ₁} {lℓ₁} {fℓ₂} {lℓ₂} (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ lℓ₁ ⊔ fℓ₂) where
+  module τ₁ = Type τ₁
+  module τ₂ = Type τ₂
+
+  field
+    ∄[l₁∩f₂] : Empty (τ₁.Flast ∩ τ₂.First)
+    ¬n₁ : T (not τ₁.Null)
+
+record _#_ {fℓ₁} {lℓ₁} {fℓ₂} {lℓ₂} (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ fℓ₁ ⊔ fℓ₂) where
+  module τ₁ = Type τ₁
+  module τ₂ = Type τ₂
+
+  field
+    ∄[f₁∩f₂] : Empty (τ₁.First ∩ τ₂.First)
+    ¬n₁∨¬n₂ : T (not (τ₁.Null 𝔹.∨ τ₂.Null))
