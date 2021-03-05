@@ -189,17 +189,6 @@ subst-fun (μ e) e′ i γ = ⋃.⋃-cong λ {x} {y} x≈y → begin
   insert′ x≈y xs≋ys F.zero = x≈y ∷ xs≋ys
   insert′ x≈y (z≈w ∷ xs≋ys) (suc i) = z≈w ∷ insert′ x≈y xs≋ys i
 
-unroll : ∀ {n} → (e : Expression (suc n)) → μ e ≋ e [ μ e / F.zero ]
-unroll e γ = begin
-  ⟦ μ e ⟧ γ ≈⟨ {!!} ⟩
-  (λ X → ⟦ e ⟧ (X ∷ γ)) (⟦ μ e ⟧ γ) ≡⟨⟩
-  ⟦ e ⟧ (⟦ μ e ⟧ γ ∷ γ) ≡⟨⟩
-  ⟦ e ⟧ (insert γ F.zero (⟦ μ e ⟧ γ)) ≈˘⟨ subst-fun e (μ e) F.zero γ ⟩
-  ⟦ e [ μ e / F.zero ] ⟧ γ ∎
-  where
-  open import Relation.Binary.Reasoning.Setoid (L.setoid (c ⊔ ℓ) (c ⊔ ℓ))
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ) (c ⊔ ℓ)) as VE
-
 monotone : ∀ {n} (e : Expression n) → ⟦ e ⟧ Preserves PW.Pointwise L._≤_ ⟶ L._≤_
 monotone ⊥ γ≤γ′ = ≤-refl
 monotone ε γ≤γ′ = ≤-refl
