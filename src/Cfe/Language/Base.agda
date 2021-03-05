@@ -21,6 +21,7 @@ open import Relation.Binary.PropositionalEquality as ≡ using (_≡_)
 open import Relation.Binary.Indexed.Heterogeneous
 
 infix 4 _∈_
+infix 4 _∉_
 
 Language : ∀ a aℓ → Set (suc c ⊔ suc a ⊔ suc aℓ)
 Language a aℓ = IndexedSetoid (List C) a aℓ
@@ -57,6 +58,9 @@ Lift b bℓ A = record
 
 _∈_ : ∀ {a aℓ} → List C → Language a aℓ → Set a
 _∈_ = flip 𝕃
+
+_∉_ : ∀ {a aℓ} → List C → Language a aℓ → Set a
+l ∉ A = l ∈ A → ⊥
 
 ∈-cong : ∀ {a aℓ} → (A : Language a aℓ) → ∀ {l₁ l₂} → l₁ ≡ l₂ → l₁ ∈ A → l₂ ∈ A
 ∈-cong A ≡.refl l∈A = l∈A

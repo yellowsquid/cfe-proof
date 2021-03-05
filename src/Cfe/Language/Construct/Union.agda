@@ -25,7 +25,7 @@ module _
   where
 
   infix 4 _≈ᵁ_
-  infix 4 _∪_
+  infix 6 _∪_
 
   Union : List C → Set (a ⊔ b)
   Union l = l ∈ A ⊎ l ∈ B
@@ -93,3 +93,9 @@ isCommutativeMonoid = record
   where
   module X≤Y = _≤_ X≤Y
   module U≤V = _≤_ U≤V
+
+∪-unique : ∀ {a aℓ b bℓ} {A : Language a aℓ} {B : Language b bℓ} → (∀ x → first A x → first B x → ⊥) → (𝕃.null A → 𝕃.null B → ⊥) → ∀ {l} → l ∈ A ∪ B → (l ∈ A × l ∉ B) ⊎ (l ∉ A × l ∈ B)
+∪-unique fA∩fB≡∅ ¬nA∨¬nB {[]}    (inj₁ []∈A) = inj₁ ([]∈A , ¬nA∨¬nB []∈A)
+∪-unique fA∩fB≡∅ ¬nA∨¬nB {x ∷ l} (inj₁ xl∈A) = inj₁ (xl∈A , (λ xl∈B → fA∩fB≡∅ x (-, xl∈A) (-, xl∈B)))
+∪-unique fA∩fB≡∅ ¬nA∨¬nB {[]}    (inj₂ []∈B) = inj₂ (flip ¬nA∨¬nB []∈B , []∈B)
+∪-unique fA∩fB≡∅ ¬nA∨¬nB {x ∷ l} (inj₂ xl∈B) = inj₂ ((λ xl∈A → fA∩fB≡∅ x (-, xl∈A) (-, xl∈B)) , xl∈B)

@@ -7,3 +7,4 @@ module Cfe.Expression
   where
 
 open import Cfe.Expression.Base setoid public
+open import Cfe.Expression.Properties setoid public
