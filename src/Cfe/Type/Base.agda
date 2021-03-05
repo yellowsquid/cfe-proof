@@ -6,13 +6,15 @@ module Cfe.Type.Base
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open Setoid over using () renaming (Carrier to C)
+open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 
 open import Cfe.Language over
-open import Data.Bool
-open import Level renaming (suc to lsuc)
-open import Relation.Unary
+open import Data.Bool as 𝔹 hiding (_∨_)
+open import Level as L renaming (suc to lsuc)
+open import Relation.Unary as U
 
+infix 7 _∙_
+infix 6 _∨_
 infix 4 _⊨_
 
 record Type fℓ lℓ : Set (c ⊔ lsuc (fℓ ⊔ lℓ)) where
@@ -22,6 +24,29 @@ record Type fℓ lℓ : Set (c ⊔ lsuc (fℓ ⊔ lℓ)) where
     Flast : Pred C lℓ
 
 open Type public
+
+τ⊥ : Type 0ℓ 0ℓ
+τ⊥ = record { Null = false ; First = U.∅ ; Flast = U.∅ }
+
+τε : Type 0ℓ 0ℓ
+τε = record { Null = true ; First = U.∅ ; Flast = U.∅ }
+
+τ[_] : C → Type ℓ 0ℓ
+τ[ c ] = record { Null = false ; First = c ∼_ ; Flast = U.∅ }
+
+_∨_ : ∀ {fℓ₁ lℓ₁ fℓ₂ lℓ₂} → Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ₂) (lℓ₁ ⊔ lℓ₂)
+τ₁ ∨ τ₂ = record
+  { Null = Null τ₁ 𝔹.∨ Null τ₂
+  ; First = First τ₁ ∪ First τ₂
+  ; Flast = Flast τ₁ ∪ Flast τ₂
+  }
+
+_∙_ : ∀ {fℓ₁ lℓ₁ fℓ₂ lℓ₂} → Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ₂) (lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂)
+_∙_ {lℓ₁ = lℓ₁} {fℓ₂} {lℓ₂} τ₁ τ₂ = record
+  { Null = Null τ₁ ∧ Null τ₂
+  ; First = First τ₁ ∪ (if Null τ₁ then First τ₂ else λ x → L.Lift fℓ₂ (x U.∈ U.∅))
+  ; Flast = Flast τ₂ ∪ (if Null τ₂ then First τ₂ ∪ Flast τ₁ else λ x → L.Lift (lℓ₁ ⊔ fℓ₂) (x U.∈ U.∅))
+  }
 
 record _⊨_ {a} {aℓ} {fℓ} {lℓ} (A : Language a aℓ) (τ : Type fℓ lℓ) : Set (c ⊔ a ⊔ fℓ ⊔ lℓ) where
   field
