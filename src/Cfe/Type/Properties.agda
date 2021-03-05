@@ -9,6 +9,7 @@ module Cfe.Type.Properties
 open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 
 open import Cfe.Language over
+open import Cfe.Language.Construct.Single over
 open import Cfe.Type.Base over
 open import Data.Empty
 open import Data.List
@@ -27,7 +28,7 @@ open import Function
 
 L⊨τ⊥⇒L≈∅ : ∀ {a aℓ} {L : Language a aℓ} → L ⊨ τ⊥ → L ≈ ∅
 L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
-  { f = λ {l} l∈L → elim l l∈L
+  { f = λ {l} → elim l
   ; f⁻¹ = λ ()
   ; cong₁ = λ {l} {_} {l∈L} → ⊥-elim (elim l l∈L)
   ; cong₂ = λ {_} {_} {}
@@ -48,15 +49,15 @@ L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
 
 L⊨τε⇒L≤｛ε｝ : ∀ {a aℓ} {L : Language a aℓ} → L ⊨ τε → L ≤ ｛ε｝
 L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
-  { f = λ {l} l∈L → elim l l∈L
-  ; cong = λ {l₁} {l₂} {l₁∈L} {l₂∈L} l₁≈l₂ → tt
+  { f = λ {l} → elim l
+  ; cong = const tt
   }
   where
   open import Data.Unit
   open import Relation.Binary.PropositionalEquality
   module L⊨τε = _⊨_ L⊨τε
 
-  elim : ∀ l (l∈L : l ∈ L) → l ∈ ｛ε｝
+  elim : ∀ l → l ∈ L → l ∈ ｛ε｝
   elim [] []∈L = refl
   elim (x ∷ l) xl∈L = ⊥-elim (L⊨τε.f⇒f (-, xl∈L))
 
@@ -68,3 +69,20 @@ L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
   }
   where
   open import Data.Unit
+
+｛c｝⊨τ[c] : ∀ c → ｛ c ｝ ⊨ τ[ c ]
+｛c｝⊨τ[c] c = record
+  { n⇒n = λ ()
+  ; f⇒f = λ {x} → λ {([] , (a , eq , a∼c)) → begin
+    c ≈˘⟨ a∼c ⟩
+    a ≡˘⟨ proj₁ (∷-injective eq) ⟩
+    x ∎}
+  ; l⇒l = λ
+    { ([] , []≢[] , _) → ⊥-elim ([]≢[] refl)
+    ; (x ∷ [] , x∷[]≢[] , ())
+    }
+  }
+  where
+  open import Data.List.Properties
+  open import Relation.Binary.Reasoning.Setoid over
+  open import Relation.Binary.PropositionalEquality
