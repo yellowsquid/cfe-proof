@@ -8,17 +8,19 @@ module Cfe.Language.Base
 
 open Setoid over using () renaming (Carrier to C)
 
-open import Cfe.Relation.Indexed
+open import Algebra
 open import Data.Empty
-open import Data.List
-open import Data.List.Relation.Binary.Equality.Setoid over
+open import Data.List hiding (null)
 open import Data.Product
+open import Data.Unit using (⊤; tt)
 open import Function hiding (Injection; Surjection; Inverse)
 import Function.Equality as Equality using (setoid)
 open import Level as L hiding (Lift)
 open import Relation.Binary.Indexed.Heterogeneous.Construct.Trivial as Trivial
-import Relation.Binary.PropositionalEquality as ≡
+open import Relation.Binary.PropositionalEquality as ≡ using (_≡_)
 open import Relation.Binary.Indexed.Heterogeneous
+
+infix 4 _∈_
 
 Language : ∀ a aℓ → Set (suc c ⊔ suc a ⊔ suc aℓ)
 Language a aℓ = IndexedSetoid (List C) a aℓ
@@ -26,24 +28,14 @@ Language a aℓ = IndexedSetoid (List C) a aℓ
 ∅ : Language 0ℓ 0ℓ
 ∅ = Trivial.indexedSetoid (≡.setoid ⊥)
 
-｛ε｝ : Language (c ⊔ ℓ) (c ⊔ ℓ)
+｛ε｝ : Language c 0ℓ
 ｛ε｝ = record
-  { Carrier = [] ≋_
-  ; _≈_ = λ {l₁} {l₂} []≋l₁ []≋l₂ → ∃[ l₁≋l₂ ] (≋-trans []≋l₁ l₁≋l₂ ≡.≡ []≋l₂)
+  { Carrier = [] ≡_
+  ; _≈_ = λ _ _ → ⊤
   ; isEquivalence = record
-    { refl = λ {_} {x} →
-      ≋-refl ,
-      ( case x return (λ x → ≋-trans x ≋-refl ≡.≡ x) of λ {[] → ≡.refl} )
-    ; sym = λ {_} {_} {x} {y} (z , _) →
-      ≋-sym z ,
-      ( case (x , y , z)
-        return (λ (x , y , z) → ≋-trans y (≋-sym z) ≡.≡ x)
-        of λ {([] , [] , []) → ≡.refl} )
-    ; trans = λ {_} {_} {_} {v} {w} {x} (y , _) (z , _) →
-      ≋-trans y z ,
-      ( case (v , w , x , y , z)
-        return (λ (v , _ , x , y , z) → ≋-trans v (≋-trans y z) ≡.≡ x)
-        of λ {([] , [] , [] , [] , []) → ≡.refl} )
+    { refl = tt
+    ; sym = λ _ → tt
+    ; trans = λ _ _ → tt
     }
   }
 
@@ -66,6 +58,9 @@ Lift b bℓ A = record
 _∈_ : ∀ {a aℓ} → List C → Language a aℓ → Set a
 _∈_ = flip 𝕃
 
+∈-cong : ∀ {a aℓ} → (A : Language a aℓ) → ∀ {l₁ l₂} → l₁ ≡ l₂ → l₁ ∈ A → l₂ ∈ A
+∈-cong A ≡.refl l∈A = l∈A
+
 ≈ᴸ : ∀ {a aℓ} → (A : Language a aℓ) → ∀ {l₁ l₂} → 𝕃 A l₁ → 𝕃 A l₂ → Set aℓ
 ≈ᴸ = IndexedSetoid._≈_
 
@@ -77,6 +72,13 @@ _∈_ = flip 𝕃
 
 ≈ᴸ-trans : ∀ {a aℓ} → (A : Language a aℓ) → Transitive (𝕃 A) (≈ᴸ A)
 ≈ᴸ-trans = IsIndexedEquivalence.trans ∘ IndexedSetoid.isEquivalence
+
+≈ᴸ-cong : ∀ {a aℓ} → (A : Language a aℓ) → ∀ {l₁ l₂ l₃ l₄} →
+          (l₁≡l₂ : l₁ ≡ l₂) → (l₃≡l₄ : l₃ ≡ l₄) →
+          (l₁∈A : l₁ ∈ A) → (l₃∈A : l₃ ∈ A) →
+          ≈ᴸ A l₁∈A l₃∈A →
+          ≈ᴸ A (∈-cong A l₁≡l₂ l₁∈A) (∈-cong A l₃≡l₄ l₃∈A)
+≈ᴸ-cong A ≡.refl ≡.refl l₁∈A l₃∈A eq = eq
 
 record _≤_ {a aℓ b bℓ} (A : Language a aℓ) (B : Language b bℓ) : Set (c ⊔ a ⊔ aℓ ⊔ b ⊔ bℓ) where
   field
@@ -119,22 +121,29 @@ record _≈_ {a aℓ b bℓ} (A : Language a aℓ) (B : Language b bℓ) : Set (
   module A≈B = _≈_ A≈B
   module B≈C = _≈_ B≈C
 
-setoid : ∀ a aℓ → B.Setoid (suc (c ⊔ a ⊔ aℓ)) (c ⊔ ℓ ⊔ a ⊔ aℓ)
-setoid a aℓ = record
-  { Carrier = Language a aℓ
-  ; _≈_ = _≈_
-  ; isEquivalence = record
-    { refl = ≈-refl
-    ; sym = ≈-sym
-    ; trans = ≈-trans
-    }
+≈-isEquivalence : ∀ {a aℓ} → B.IsEquivalence (_≈_ {a} {aℓ} {a} {aℓ})
+≈-isEquivalence = record
+  { refl = ≈-refl
+  ; sym = ≈-sym
+  ; trans = ≈-trans
   }
+
+setoid : ∀ a aℓ → B.Setoid (suc (c ⊔ a ⊔ aℓ)) (c ⊔ ℓ ⊔ a ⊔ aℓ)
+setoid a aℓ = record { isEquivalence = ≈-isEquivalence {a} {aℓ} }
 
 ≤-refl : ∀ {a aℓ} → B.Reflexive (_≤_ {a} {aℓ})
 ≤-refl = record
   { f = id
   ; cong = id
   }
+
+≤-reflexive : ∀ {a aℓ b bℓ} → _≈_ {a} {aℓ} {b} {bℓ} B.⇒ _≤_
+≤-reflexive A≈B = record
+  { f = A≈B.f
+  ; cong = A≈B.cong₁
+  }
+  where
+  module A≈B = _≈_ A≈B
 
 ≤-trans : ∀ {a aℓ b bℓ c cℓ} → B.Trans (_≤_ {a} {aℓ}) (_≤_ {b} {bℓ} {c} {cℓ}) _≤_
 ≤-trans A≤B B≤C = record
@@ -161,3 +170,25 @@ setoid a aℓ = record
   { f = λ ()
   ; cong = λ {_} {_} {}
   }
+
+≤-isPartialOrder : ∀ a aℓ → B.IsPartialOrder (_≈_ {a} {aℓ}) _≤_
+≤-isPartialOrder a aℓ = record
+  { isPreorder = record
+    { isEquivalence = ≈-isEquivalence
+    ; reflexive = ≤-reflexive
+    ; trans = ≤-trans
+    }
+  ; antisym = ≤-antisym
+  }
+
+poset : ∀ a aℓ → B.Poset (suc (c ⊔ a ⊔ aℓ)) (c ⊔ ℓ ⊔ a ⊔ aℓ) (c ⊔ a ⊔ aℓ)
+poset a aℓ = record { isPartialOrder = ≤-isPartialOrder a aℓ }
+
+null : ∀ {a} {aℓ} → Language a aℓ → Set a
+null A = [] ∈ A
+
+first : ∀ {a} {aℓ} → Language a aℓ → C → Set (c ⊔ a)
+first A x = ∃[ l ] x ∷ l ∈ A
+
+flast : ∀ {a} {aℓ} → Language a aℓ → C → Set (c ⊔ a)
+flast A x = ∃[ l ] (l ≡.≢ [] × ∃[ l′ ] l ++ x ∷ l′ ∈ A)

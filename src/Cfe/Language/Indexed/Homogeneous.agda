@@ -31,17 +31,3 @@ record IndexedLanguage i iℓ a aℓ : Set (ℓ ⊔ suc (c ⊔ i ⊔ iℓ ⊔ a 
 
   _≈ᵗ_ : IRel Tagged (iℓ ⊔ aℓ)
   _≈ᵗ_ (i , l∈Fi) (j , m∈Fj) = Σ (i ≈ᵢ j) λ i≈j → ≈ᴸ (F j) (f (cong i≈j) l∈Fi) m∈Fj
-
-  -- ≈ᵗ-refl : Reflexive Tagged _≈ᵗ_
-  -- ≈ᵗ-refl {l} {i , l∈Fi} = reflᵢ , {!≈ᴸ-refl!}
-
-  -- ⋃ : Language (i ⊔ a) (iℓ ⊔ aℓ)
-  -- ⋃ = record
-  --   { Carrier = Tagged
-  --   ; _≈_ = _≈ᵗ_
-  --   ; isEquivalence = record
-  --     { refl = λ i≈j → {!!}
-  --     ; sym = {!!}
-  --     ; trans = {!!}
-  --     }
-  --   }
