@@ -10,7 +10,7 @@ open Setoid over using () renaming (Carrier to C)
 
 open import Algebra
 open import Cfe.Expression.Base over
-open import Cfe.Language.Base over as L
+open import Cfe.Language over as L
 import Cfe.Language.Construct.Concatenate over as ∙
 import Cfe.Language.Construct.Union over as ∪
 import Cfe.Language.Indexed.Construct.Iterate over as ⋃
