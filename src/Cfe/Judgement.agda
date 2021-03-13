@@ -7,3 +7,4 @@ module Cfe.Judgement
   where
 
 open import Cfe.Judgement.Base over public
+open import Cfe.Judgement.Properties over public

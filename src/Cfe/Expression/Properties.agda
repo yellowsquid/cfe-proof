@@ -9,12 +9,13 @@ module Cfe.Expression.Properties
 open Setoid over using () renaming (Carrier to C)
 
 open import Algebra
-open import Cfe.Expression.Base over
+open import Cfe.Expression.Base over as E
 open import Cfe.Language over as L
 import Cfe.Language.Construct.Concatenate over as ∙
 import Cfe.Language.Construct.Union over as ∪
 import Cfe.Language.Indexed.Construct.Iterate over as ⋃
 open import Data.Fin as F
+open import Data.Fin.Properties
 open import Data.Nat as ℕ hiding (_⊔_)
 open import Data.Product
 open import Data.Sum
@@ -190,10 +191,39 @@ subst-fun (μ e) e′ i γ = ⋃.⋃-cong λ {x} {y} x≈y → begin
   insert′ x≈y (z≈w ∷ xs≋ys) (suc i) = z≈w ∷ insert′ x≈y xs≋ys i
 
 monotone : ∀ {n} (e : Expression n) → ⟦ e ⟧ Preserves PW.Pointwise L._≤_ ⟶ L._≤_
-monotone ⊥ γ≤γ′ = ≤-refl
-monotone ε γ≤γ′ = ≤-refl
-monotone (Char x) γ≤γ′ = ≤-refl
+monotone ⊥ γ≤γ′ = L.≤-refl
+monotone ε γ≤γ′ = L.≤-refl
+monotone (Char x) γ≤γ′ = L.≤-refl
 monotone (e₁ ∨ e₂) γ≤γ′ = ∪.∪-monotone (monotone e₁ γ≤γ′) (monotone e₂ γ≤γ′)
 monotone (e₁ ∙ e₂) γ≤γ′ = ∙.∙-monotone (monotone e₁ γ≤γ′) (monotone e₂ γ≤γ′)
 monotone (Var i) γ≤γ′ = PW.lookup γ≤γ′ i
 monotone (μ e) γ≤γ′ = ⋃.⋃-monotone (λ x≤y → monotone e (x≤y PW.∷ γ≤γ′))
+
+cast-inverse : ∀ {m n} e → .(m≡n : m ≡ n) → .(n≡m : n ≡ m) → E.cast m≡n (E.cast n≡m e) ≡ e
+cast-inverse ⊥ m≡n n≡m = ≡.refl
+cast-inverse ε m≡n n≡m = ≡.refl
+cast-inverse (Char x) m≡n n≡m = ≡.refl
+cast-inverse (e₁ ∨ e₂) m≡n n≡m = ≡.cong₂ _∨_ (cast-inverse e₁ m≡n n≡m) (cast-inverse e₂ m≡n n≡m)
+cast-inverse (e₁ ∙ e₂) m≡n n≡m = ≡.cong₂ _∙_ (cast-inverse e₁ m≡n n≡m) (cast-inverse e₂ m≡n n≡m)
+cast-inverse (Var x) m≡n n≡m = ≡.cong Var (toℕ-injective (begin
+  toℕ (F.cast m≡n (F.cast n≡m x)) ≡⟨ toℕ-cast m≡n (F.cast n≡m x) ⟩
+  toℕ (F.cast n≡m x)              ≡⟨ toℕ-cast n≡m x ⟩
+  toℕ x                           ∎))
+  where
+  open ≡.≡-Reasoning
+cast-inverse (μ e) m≡n n≡m = ≡.cong μ (cast-inverse e (≡.cong suc m≡n) (≡.cong suc n≡m))
+
+cast-involutive : ∀ {k m n} e → .(k≡m : k ≡ m) → .(m≡n : m ≡ n) → .(k≡n : k ≡ n) → E.cast m≡n (E.cast k≡m e) ≡ E.cast k≡n e
+cast-involutive ⊥ k≡m m≡n k≡n = ≡.refl
+cast-involutive ε k≡m m≡n k≡n = ≡.refl
+cast-involutive (Char x) k≡m m≡n k≡n = ≡.refl
+cast-involutive (e₁ ∨ e₂) k≡m m≡n k≡n = ≡.cong₂ _∨_ (cast-involutive e₁ k≡m m≡n k≡n) (cast-involutive e₂ k≡m m≡n k≡n)
+cast-involutive (e₁ ∙ e₂) k≡m m≡n k≡n = ≡.cong₂ _∙_ (cast-involutive e₁ k≡m m≡n k≡n) (cast-involutive e₂ k≡m m≡n k≡n)
+cast-involutive (Var x) k≡m m≡n k≡n = ≡.cong Var (toℕ-injective (begin
+  toℕ (F.cast m≡n (F.cast k≡m x)) ≡⟨ toℕ-cast m≡n (F.cast k≡m x) ⟩
+  toℕ (F.cast k≡m x)              ≡⟨ toℕ-cast k≡m x ⟩
+  toℕ x                           ≡˘⟨ toℕ-cast k≡n x ⟩
+  toℕ (F.cast k≡n x)              ∎))
+  where
+  open ≡.≡-Reasoning
+cast-involutive (μ e) k≡m m≡n k≡n = ≡.cong μ (cast-involutive e (≡.cong suc k≡m) (≡.cong suc m≡n) (≡.cong suc k≡n))

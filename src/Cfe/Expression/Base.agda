@@ -15,11 +15,12 @@ open import Cfe.Language.Construct.Concatenate over renaming (_∙_ to _∙ₗ_)
 open import Cfe.Language.Construct.Single over
 open import Cfe.Language.Construct.Union over
 open import Cfe.Language.Indexed.Construct.Iterate over
-open import Data.Fin as F hiding (_≤_)
+open import Data.Fin as F hiding (_≤_; cast)
 open import Data.Nat as ℕ hiding (_≤_; _⊔_)
 open import Data.Product
 open import Data.Vec
 open import Level renaming (suc to lsuc) hiding (Lift)
+open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 
 infix 10 _[_/_]
@@ -35,6 +36,15 @@ data Expression : ℕ → Set c where
   _∙_ : ∀ {n} → Expression n → Expression n → Expression n
   Var : ∀ {n} → Fin n → Expression n
   μ : ∀ {n} → Expression (suc n) → Expression n
+
+cast : ∀ {m n} → .(_ : m ≡ n) → Expression m → Expression n
+cast eq ⊥ = ⊥
+cast eq ε = ε
+cast eq (Char x) = Char x
+cast eq (e₁ ∨ e₂) = cast eq e₁ ∨ cast eq e₂
+cast eq (e₁ ∙ e₂) = cast eq e₁ ∙ cast eq e₂
+cast eq (Var i) = Var (F.cast eq i)
+cast eq (μ e) = μ (cast (cong suc eq) e)
 
 wkn : ∀ {n} → Expression n → Fin (suc n) → Expression (suc n)
 wkn ⊥ i = ⊥
