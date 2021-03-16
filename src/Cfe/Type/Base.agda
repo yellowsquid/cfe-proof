@@ -48,7 +48,7 @@ _∙_ {lℓ₁ = lℓ₁} {fℓ₂} {lℓ₂} τ₁ τ₂ = record
   ; Flast = Flast τ₂ ∪ (if Null τ₂ then First τ₂ ∪ Flast τ₁ else λ x → L.Lift (lℓ₁ ⊔ fℓ₂) (x U.∈ U.∅))
   }
 
-record _⊨_ {a} {aℓ} {fℓ} {lℓ} (A : Language a aℓ) (τ : Type fℓ lℓ) : Set (c ⊔ a ⊔ fℓ ⊔ lℓ) where
+record _⊨_ {a} {fℓ} {lℓ} (A : Language a) (τ : Type fℓ lℓ) : Set (c ⊔ a ⊔ fℓ ⊔ lℓ) where
   field
     n⇒n : null A → T (Null τ)
     f⇒f : first A ⊆ First τ

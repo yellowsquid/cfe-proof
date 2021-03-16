@@ -28,10 +28,10 @@ data _,_⊢_∶_ : {m : ℕ} → {n : ℕ} → Vec (Type ℓ ℓ) m → Vec (Typ
   Vee : ∀ {m n} {Γ : Vec _ m} {Δ : Vec _ n} {e₁ e₂ τ₁ τ₂} → Γ , Δ ⊢ e₁ ∶ τ₁ → Γ , Δ ⊢ e₂ ∶ τ₂ → (τ₁#τ₂ : τ₁ # τ₂) → Γ , Δ ⊢ e₁ ∨ e₂ ∶ τ₁ ∨ₜ τ₂
 
 vcast : ∀ {a A m n} → .(m ≡ n) → Vec {a} A m → Vec A n
+vcast {n = ℕ.zero} eq [] = []
 vcast {n = suc n} eq (x ∷ xs) = x ∷ vcast (suc-injective eq) xs
   where
   open import Data.Nat.Properties using (suc-injective)
-vcast {n = ℕ.zero} eq [] = []
 
 data _≅_ {a A} : {m n : ℕ} → Vec {a} A m → Vec A n → Set a where
   []≅[] : [] ≅ []

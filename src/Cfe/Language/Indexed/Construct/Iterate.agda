@@ -49,60 +49,32 @@ module _
   f≤g⇒fn≤gn f≤g (suc n) x = f≤g (f≤g⇒fn≤gn f≤g n x)
 
 module _
-  {a aℓ}
+  {a}
   where
-  Iterate : (Language a aℓ → Language a aℓ) → IndexedLanguage 0ℓ 0ℓ a aℓ
+  Iterate : (Language a → Language a) → IndexedLanguage 0ℓ 0ℓ a
   Iterate f = record
     { Carrierᵢ = ℕ
     ; _≈ᵢ_ = ≡._≡_
     ; isEquivalenceᵢ = ≡.isEquivalence
-    ; F = λ n → iter f n (Lift a aℓ ∅)
+    ; F = λ n → iter f n (Lift a ∅)
     ; cong = λ {≡.refl → ≈-refl}
     }
 
-  ≈ᵗ-refl : (g : Language a aℓ → Language a aℓ) →
-            Reflexive (Tagged (Iterate g)) (_≈ᵗ_ (Iterate g))
-  ≈ᵗ-refl g {_} {n , _} = refl , (≈ᴸ-refl (Iter.F n))
-    where
-    module Iter = IndexedLanguage (Iterate g)
-
-  ≈ᵗ-sym : (g : Language a aℓ → Language a aℓ) →
-           Symmetric (Tagged (Iterate g)) (_≈ᵗ_ (Iterate g))
-  ≈ᵗ-sym g {_} {_} {n , _} (refl , x∈Fn≈y∈Fn) =
-    refl , (≈ᴸ-sym (Iter.F n) x∈Fn≈y∈Fn)
-    where
-    module Iter = IndexedLanguage (Iterate g)
-
-  ≈ᵗ-trans : (g : Language a aℓ → Language a aℓ) →
-             Transitive (Tagged (Iterate g)) (_≈ᵗ_ (Iterate g))
-  ≈ᵗ-trans g {_} {_} {_} {n , _} (refl , x∈Fn≈y∈Fn) (refl , y∈Fn≈z∈Fn) =
-    refl , (≈ᴸ-trans (Iter.F n) x∈Fn≈y∈Fn y∈Fn≈z∈Fn)
-    where
-    module Iter = IndexedLanguage (Iterate g)
-
-  ⋃ : (Language a aℓ → Language a aℓ) → Language a aℓ
+  ⋃ : (Language a → Language a) → Language a
   ⋃ f = record
-    { Carrier = Iter.Tagged
-    ; _≈_ = Iter._≈ᵗ_
-    ; isEquivalence = record
-      { refl = ≈ᵗ-refl f
-      ; sym = ≈ᵗ-sym f
-      ; trans = ≈ᵗ-trans f
-      }
+    { 𝕃 = Iter.Tagged
+    ; ∈-resp-≋ = λ { l₁≋l₂ (i , l₁∈fi) → i , Language.∈-resp-≋ (Iter.F i) l₁≋l₂ l₁∈fi }
     }
     where
     module Iter = IndexedLanguage (Iterate f)
 
-  ⋃-cong : ∀ {f g : Language a aℓ → Language a aℓ} → (∀ {x y} → x ≈ y → f x ≈ g y) → ⋃ f ≈ ⋃ g
+  ⋃-cong : ∀ {f g} → (∀ {x y} → x ≈ y → f x ≈ g y) → ⋃ f ≈ ⋃ g
   ⋃-cong f≈g = record
-    { f = λ { (n , l∈fn) → n , _≈_.f (f≈g⇒fn≈gn (L.setoid a aℓ) f≈g n (Lift a aℓ ∅)) l∈fn}
-    ; f⁻¹ = λ { (n , l∈gn) → n , _≈_.f⁻¹ (f≈g⇒fn≈gn (L.setoid a aℓ) f≈g n (Lift a aℓ ∅)) l∈gn}
-    ; cong₁ = λ {_} {_} {(i , _)} → λ { (refl , l₁≈l₂) → refl , _≈_.cong₁ (f≈g⇒fn≈gn (L.setoid a aℓ) f≈g i (Lift a aℓ ∅)) l₁≈l₂}
-    ; cong₂ = λ {_} {_} {(i , _)} → λ { (refl , l₁≈l₂) → refl , _≈_.cong₂ (f≈g⇒fn≈gn (L.setoid a aℓ) f≈g i (Lift a aℓ ∅)) l₁≈l₂}
+    { f = λ { (n , l∈fn) → n , _≈_.f (f≈g⇒fn≈gn (L.setoid a) f≈g n (Lift a ∅)) l∈fn}
+    ; f⁻¹ = λ { (n , l∈gn) → n , _≈_.f⁻¹ (f≈g⇒fn≈gn (L.setoid a) f≈g n (Lift a ∅)) l∈gn}
     }
 
-  ⋃-monotone : ∀ {f g : Language a aℓ → Language a aℓ} → (∀ {x y} → x ≤ y → f x ≤ g y) → ⋃ f ≤ ⋃ g
-  ⋃-monotone f≤g = record
-    { f = λ { (n , l∈fn) → n , _≤_.f (f≤g⇒fn≤gn (poset a aℓ) f≤g n (Lift a aℓ ∅)) l∈fn }
-    ; cong = λ {_} {_} {(i , _)} → λ { (refl , l₁≈l₂) → refl , _≤_.cong (f≤g⇒fn≤gn (poset a aℓ) f≤g i (Lift a aℓ ∅)) l₁≈l₂ }
+  ⋃-mono : ∀ {f g} → (∀ {x y} → x ≤ y → f x ≤ g y) → ⋃ f ≤ ⋃ g
+  ⋃-mono f≤g = record
+    { f = λ { (n , l∈fn) → n , _≤_.f (f≤g⇒fn≤gn (poset a) f≤g n (Lift a ∅)) l∈fn }
     }

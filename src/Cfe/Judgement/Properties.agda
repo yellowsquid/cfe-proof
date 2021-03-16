@@ -13,11 +13,65 @@ open import Data.Empty
 open import Data.Fin as F hiding (cast)
 open import Data.Fin.Properties
 open import Data.Nat as ℕ
-open import Data.Nat.Properties
+open import Data.Nat.Properties as NP
 open import Data.Vec
 open import Data.Vec.Properties
 open import Function
 open import Relation.Binary.PropositionalEquality
+open import Relation.Nullary
+
+private
+  raise-mono : ∀ {m n i j} → i F.≤ j → raise {n} m i F.≤ raise m j
+  raise-mono {zero} i≤j = i≤j
+  raise-mono {suc m} i≤j = s≤s (raise-mono i≤j)
+
+  raise≤ : ∀ {m} n i → n ℕ.≤ toℕ (raise {m} n i)
+  raise≤ zero i = z≤n
+  raise≤ (suc n) i = s≤s (raise≤ n i)
+
+  inject+≤raise : ∀ {m n} i j → inject+ {suc n} m i F.≤ F.cast (+-suc n m) (raise {suc m} n j)
+  inject+≤raise {m} {n} i j = begin
+    toℕ (inject+ m i)          ≡˘⟨ toℕ-inject+ m i ⟩
+    toℕ i                      ≤⟨ NP.<⇒≤pred (toℕ<n i) ⟩
+    n                          ≤⟨ m≤m+n n (toℕ j) ⟩
+    n ℕ.+ toℕ j                ≡˘⟨ toℕ-raise n j ⟩
+    toℕ (raise n j)            ≡˘⟨ toℕ-cast (+-suc n m) (raise n j) ⟩
+    toℕ (F.cast _ (raise n j)) ∎
+    where
+    open ≤-Reasoning
+
+  toℕ-punchIn : ∀ {m} i j → toℕ j ℕ.≤ toℕ (punchIn {m} i j)
+  toℕ-punchIn zero j = n≤1+n (toℕ j)
+  toℕ-punchIn (suc i) zero = z≤n
+  toℕ-punchIn (suc i) (suc j) = s≤s (toℕ-punchIn i j)
+
+  toℕ-punchOut : ∀ {m i j} → (i≢j : i ≢ j) → toℕ j ℕ.≤ suc (toℕ (punchOut {m} i≢j))
+  toℕ-punchOut {_} {zero} {zero} i≢j = ⊥-elim (i≢j refl)
+  toℕ-punchOut {_} {zero} {suc j} i≢j = NP.≤-refl
+  toℕ-punchOut {suc m} {suc i} {zero} i≢j = z≤n
+  toℕ-punchOut {suc m} {suc i} {suc j} i≢j = s≤s (toℕ-punchOut (i≢j ∘ cong suc))
+
+  toℕ-reduce : ∀ {m n} i i≥m → toℕ (reduce≥ {m} {n} i i≥m) ≡ toℕ i ∸ m
+  toℕ-reduce {zero} i i≥m = refl
+  toℕ-reduce {suc m} (suc i) (s≤s i≥m) = toℕ-reduce i i≥m
+
+  <⇒punchOut≤ : ∀ {m n i j} → n ℕ.< toℕ j → (i≢j : i ≢ j) → n ℕ.≤ toℕ (punchOut {m} i≢j)
+  <⇒punchOut≤ {m} {n} {zero} {suc j} (s≤s n<j) i≢j = n<j
+  <⇒punchOut≤ {suc m} {zero} {suc i} {suc j} (s≤s n<j) i≢j = z≤n
+  <⇒punchOut≤ {suc m} {suc n} {suc i} {suc j} (s≤s n<j) i≢j = s≤s (<⇒punchOut≤ n<j (i≢j ∘ cong suc))
+
+  punchIn-∸ : ∀ {m n} i {j} j≥n → toℕ (punchIn (F.cast (+-suc n m) (raise n i)) j) ∸ n ≡ toℕ (punchIn i (reduce≥ j j≥n))
+  punchIn-∸ {zero} {n} zero {j} j≥n = ⊥-elim (<⇒≱ (begin-strict
+    toℕ j ≡˘⟨ toℕ-cast (+-identityʳ n) j ⟩
+    toℕ (F.cast _ j) <⟨ toℕ<n (F.cast _ j) ⟩
+    n ∎) j≥n)
+    where
+    open ≤-Reasoning
+  punchIn-∸ {suc m} {zero} zero {j} z≤n = refl
+  punchIn-∸ {suc m} {suc n} zero {suc j} (s≤s j≥n) = punchIn-∸ zero j≥n
+  punchIn-∸ {suc m} {zero} (suc i) {zero} z≤n = refl
+  punchIn-∸ {suc m} {zero} (suc i) {suc j} z≤n = cong suc (punchIn-∸ i z≤n)
+  punchIn-∸ {suc m} {suc n} (suc i) {suc j} (s≤s j≥n) = punchIn-∸ (suc i) j≥n
 
 ≅-refl : ∀ {a A m} {xs : Vec {a} A m} → xs ≅ xs
 ≅-refl {xs = []} = []≅[]
@@ -29,6 +83,10 @@ open import Relation.Binary.PropositionalEquality
 ≅-length : ∀ {a A m n} {xs : Vec {a} A m} {ys : Vec _ n} → xs ≅ ys → m ≡ n
 ≅-length []≅[] = refl
 ≅-length (_ ∷ xs≅ys) = cong suc (≅-length xs≅ys)
+
+≅-vcast : ∀ {a A m n} {xs : Vec {a} A m} → .(m≡n : m ≡ n) → vcast m≡n xs ≅ xs
+≅-vcast {n = zero} {[]} m≡n = []≅[]
+≅-vcast {n = suc n} {x ∷ xs} m≡n = refl ∷ ≅-vcast (NP.suc-injective m≡n)
 
 ≅⇒≡ : ∀ {a A m n} {xs : Vec {a} A m} {ys : Vec _ n} → (xs≅ys : xs ≅ ys) → vcast (≅-length xs≅ys) xs ≡ ys
 ≅⇒≡ []≅[] = refl
@@ -69,7 +127,7 @@ cast₁ eq (Fix Γ₁,τ∷Δ⊢e∶τ) = Fix (cast₁ eq Γ₁,τ∷Δ⊢e∶τ
 cast₁ {Δ = Δ} eq (Cat Γ₁,Δ⊢e₁∶τ₁ Δ++Γ₁,∙⊢e₂∶τ₂ τ₁⊛τ₂) = Cat (cast₁ eq Γ₁,Δ⊢e₁∶τ₁) (cast₁ (++ˡ Δ eq) Δ++Γ₁,∙⊢e₂∶τ₂) τ₁⊛τ₂
 cast₁ eq (Vee Γ₁,Δ⊢e₁∶τ₁ Γ₁,Δ⊢e₂∶τ₂ τ₁#τ₂) = Vee (cast₁ eq Γ₁,Δ⊢e₁∶τ₁) (cast₁ eq Γ₁,Δ⊢e₂∶τ₂) τ₁#τ₂
 
-wkn₁ : ∀ {m n} {Γ : Vec (Type ℓ ℓ) m} {Δ : Vec (Type ℓ ℓ) n} {e τ} →
+wkn₁ : ∀ {m n} {Γ : Vec _ m} {Δ : Vec _ n} {e τ} →
        Γ , Δ ⊢ e ∶ τ →
        ∀ τ′ i →
        insert Γ i τ′ , Δ ⊢ cast (sym (+-suc n m)) (wkn e (F.cast (+-suc n m) (raise n i))) ∶ τ
@@ -78,16 +136,11 @@ wkn₁ (Char c) τ′ i = Char c
 wkn₁ Bot τ′ i = Bot
 wkn₁ {m} {n} {Γ} {Δ} {e} {τ} (Var {i = j} j≥n) τ′ i =
   subst (insert Γ i τ′ , Δ ⊢ cast (sym (+-suc n m)) (Var (punchIn (F.cast (+-suc n m) (raise n i)) j)) ∶_)
-        (eq Γ τ′ i j≥n)
-        (Var (le i j≥n))
+        eq
+        (Var le)
   where
-  toℕ-punchIn : ∀ {m} i j → toℕ j ℕ.≤ toℕ (punchIn {m} i j)
-  toℕ-punchIn zero j = n≤1+n (toℕ j)
-  toℕ-punchIn (suc i) zero = z≤n
-  toℕ-punchIn (suc i) (suc j) = s≤s (toℕ-punchIn i j)
-
-  le : ∀ {m n} i {j} → toℕ j ≥ n → toℕ (F.cast (sym (+-suc n m)) (punchIn (F.cast (+-suc n m) (raise n i)) j)) ≥ n
-  le {m} {n} i {j} j≥n = begin
+  le : toℕ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) ≥ n
+  le  = begin
     n ≤⟨ j≥n ⟩
     toℕ j ≤⟨ toℕ-punchIn (F.cast (+-suc n m) (raise n i)) j ⟩
     toℕ (punchIn (F.cast _ (raise n i)) j) ≡˘⟨ toℕ-cast (sym (+-suc n m)) (punchIn (F.cast _ (raise n i)) j) ⟩
@@ -99,35 +152,18 @@ wkn₁ {m} {n} {Γ} {Δ} {e} {τ} (Var {i = j} j≥n) τ′ i =
   lookup-cast l zero = refl
   lookup-cast (x ∷ l) (suc j) = lookup-cast l j
 
-  toℕ-reduce : ∀ {m n} i i≥m → toℕ (reduce≥ {m} {n} i i≥m) ≡ toℕ i ∸ m
-  toℕ-reduce {zero} i i≥m = refl
-  toℕ-reduce {suc m} (suc i) (s≤s i≥m) = toℕ-reduce i i≥m
-
-  punchIn-∸ : ∀ {m n} i {j} j≥n → toℕ (punchIn (F.cast (+-suc n m) (raise n i)) j) ∸ n ≡ toℕ (punchIn i (reduce≥ j j≥n))
-  punchIn-∸ {zero} {n} zero {j} j≥n = ⊥-elim (<⇒≱ (begin-strict
-    toℕ j ≡˘⟨ toℕ-cast (+-identityʳ n) j ⟩
-    toℕ (F.cast _ j) <⟨ toℕ<n (F.cast _ j) ⟩
-    n ∎) j≥n)
-    where
-    open ≤-Reasoning
-  punchIn-∸ {suc m} {zero} zero {j} z≤n = refl
-  punchIn-∸ {suc m} {suc n} zero {suc j} (s≤s j≥n) = punchIn-∸ zero j≥n
-  punchIn-∸ {suc m} {zero} (suc i) {zero} z≤n = refl
-  punchIn-∸ {suc m} {zero} (suc i) {suc j} z≤n = cong suc (punchIn-∸ i z≤n)
-  punchIn-∸ {suc m} {suc n} (suc i) {suc j} (s≤s j≥n) = punchIn-∸ (suc i) j≥n
-
-  missing-link : ∀ {m n} i {j} j≥n → reduce≥ (F.cast (sym (+-suc n m)) (punchIn (F.cast (+-suc n m) (raise n i)) j)) (le i j≥n) ≡ punchIn i (reduce≥ j j≥n)
-  missing-link {n = n} i {j} j≥n = toℕ-injective (begin
-    toℕ (reduce≥ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) (le i j≥n)) ≡⟨ toℕ-reduce (F.cast _ (punchIn (F.cast _ (raise n i)) j)) (le i j≥n) ⟩
+  missing-link : reduce≥ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) le ≡ punchIn i (reduce≥ j j≥n)
+  missing-link = toℕ-injective (begin
+    toℕ (reduce≥ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) le) ≡⟨ toℕ-reduce (F.cast _ (punchIn (F.cast _ (raise n i)) j)) le ⟩
     toℕ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) ∸ n ≡⟨ cong (_∸ n) (toℕ-cast _ (punchIn (F.cast _ (raise n i)) j)) ⟩
     toℕ (punchIn (F.cast _ (raise n i)) j) ∸ n ≡⟨ punchIn-∸ i j≥n ⟩
     toℕ (punchIn i (reduce≥ j j≥n)) ∎)
     where
     open ≡-Reasoning
 
-  eq : ∀ {a} {A : Set a} {m n} (Γ : Vec A m) τ′ i {j} j≥n → lookup (insert Γ i τ′) (reduce≥ (F.cast (sym (+-suc n m)) (punchIn (F.cast (+-suc n m) (raise n i)) j)) (le i {j} j≥n)) ≡ lookup Γ (reduce≥ j j≥n)
-  eq {n = n} Γ τ′ i {j} j≥n = begin
-    lookup (insert Γ i τ′) (reduce≥ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) (le i j≥n)) ≡⟨ cong (lookup (insert Γ i τ′)) (missing-link i j≥n) ⟩
+  eq : lookup (insert Γ i τ′) (reduce≥ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) le) ≡ lookup Γ (reduce≥ j j≥n)
+  eq = begin
+    lookup (insert Γ i τ′) (reduce≥ (F.cast _ (punchIn (F.cast _ (raise n i)) j)) le) ≡⟨ cong (lookup (insert Γ i τ′)) missing-link ⟩
     lookup (insert Γ i τ′) (punchIn i (reduce≥ j j≥n)) ≡⟨ insert-punchIn Γ i τ′ (reduce≥ j j≥n) ⟩
     lookup Γ (reduce≥ j j≥n) ∎
     where
@@ -157,10 +193,9 @@ wkn₁{m} {n} {Γ} {Δ} (Cat {e₂ = e₂} {τ₂ = τ₂} Γ,Δ⊢e₁∶τ₁ 
     toℕ (F.cast k≡m i) ≡⟨ toℕ-cast k≡m i ⟩
     toℕ i ≡˘⟨ toℕ-cast k≡n i ⟩
     toℕ (F.cast k≡n i) ∎)
-
 wkn₁ (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) τ′ i = Vee (wkn₁ Γ,Δ⊢e₁∶τ₁ τ′ i) (wkn₁ Γ,Δ⊢e₂∶τ₂ τ′ i) τ₁#τ₂
 
-wkn₂ : ∀ {m n} {Γ : Vec (Type ℓ ℓ) m} {Δ : Vec (Type ℓ ℓ) n} {e τ} →
+wkn₂ : ∀ {m n} {Γ : Vec _ m} {Δ : Vec _ n} {e τ} →
        Γ , Δ ⊢ e ∶ τ →
        ∀ τ′ i →
        Γ , insert Δ i τ′ ⊢ wkn e (inject+ m i) ∶ τ
@@ -177,13 +212,10 @@ wkn₂ {m} {n} {Γ} {Δ} (Var {i = j} j≥n) τ′ i =
   where
   open ≤-Reasoning
 
-  m<n+1⇒m≤n : ∀ {m n} → m ℕ.< suc n → m ℕ.≤ n
-  m<n+1⇒m≤n (s≤s m≤n) = m≤n
-
   i≤j : toℕ (inject+ m i) ℕ.≤ toℕ j
   i≤j = begin
     toℕ (inject+ m i) ≡˘⟨ toℕ-inject+ m i ⟩
-    toℕ i ≤⟨ m<n+1⇒m≤n (toℕ<n i) ⟩
+    toℕ i ≤⟨ NP.<⇒≤pred (toℕ<n i) ⟩
     n ≤⟨ j≥n ⟩
     toℕ j ∎
 

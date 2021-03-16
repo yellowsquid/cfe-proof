@@ -66,10 +66,21 @@ Var j [ e′ / i ] with i F.≟ j
 ... | no i≢j = Var (punchOut i≢j)
 μ e [ e′ / i ] = μ (e [ wkn e′ F.zero / suc i ])
 
-⟦_⟧ : ∀ {n : ℕ} → Expression n → Vec (Language (c ⊔ ℓ) (c ⊔ ℓ)) n → Language (c ⊔ ℓ) (c ⊔ ℓ)
-⟦ ⊥ ⟧ _ = Lift (c ⊔ ℓ) (c ⊔ ℓ) ∅
-⟦ ε ⟧ _ = Lift ℓ (c ⊔ ℓ) ｛ε｝
-⟦ Char x ⟧ _ = Lift ℓ (c ⊔ ℓ) ｛ x ｝
+shift : ∀ {n} → Expression n → (i j : Fin n) → .(_ : i F.≤ j) → Expression n
+shift ⊥ _ _ _ = ⊥
+shift ε _ _ _ = ε
+shift (Char x) _ _ _ = Char x
+shift (e₁ ∨ e₂) i j i≤j = shift e₁ i j i≤j ∨ shift e₂ i j i≤j
+shift (e₁ ∙ e₂) i j i≤j = shift e₁ i j i≤j ∙ shift e₂ i j i≤j
+shift {suc n} (Var k) i j _ with i F.≟ k
+... | yes i≡k = Var j
+... | no i≢k = Var (punchIn j (punchOut i≢k))
+shift (μ e) i j i≤j = μ (shift e (suc i) (suc j) (s≤s i≤j))
+
+⟦_⟧ : ∀ {n : ℕ} → Expression n → Vec (Language (c ⊔ ℓ)) n → Language (c ⊔ ℓ)
+⟦ ⊥ ⟧ _ = Lift (c ⊔ ℓ) ∅
+⟦ ε ⟧ _ = Lift ℓ ｛ε｝
+⟦ Char x ⟧ _ = Lift ℓ ｛ x ｝
 ⟦ e₁ ∨ e₂ ⟧ γ = ⟦ e₁ ⟧ γ ∪ ⟦ e₂ ⟧ γ
 ⟦ e₁ ∙ e₂ ⟧ γ = ⟦ e₁ ⟧ γ ∙ₗ ⟦ e₂ ⟧ γ
 ⟦ Var n ⟧ γ = lookup γ n
