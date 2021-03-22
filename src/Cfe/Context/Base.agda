@@ -11,40 +11,43 @@ open import Data.Empty
 open import Data.Fin as F hiding (cast)
 open import Data.Fin.Properties hiding (≤-trans)
 open import Data.Nat as ℕ hiding (_⊔_)
-open import Data.Nat.Properties
+open import Data.Nat.Properties as NP
 open import Data.Product
 open import Data.Vec
 open import Level renaming (suc to lsuc)
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
 
+≤-recomputable : ∀ {m n} → .(m ℕ.≤ n) → m ℕ.≤ n
+≤-recomputable {ℕ.zero} {n} m≤n = z≤n
+≤-recomputable {suc m} {suc n} m≤n = s≤s (≤-recomputable (pred-mono m≤n))
+
 cast : ∀ {a A m n} → .(m ≡ n) → Vec {a} A m → Vec {a} A n
 cast {m = 0} {0} eq [] = []
 cast {m = suc _} {suc n} eq (x ∷ xs) = x ∷ cast (cong ℕ.pred eq) xs
 
-reduce≥′ : ∀ {m n} → .(m ℕ.≤ n) → (i : Fin n) → toℕ i ≥ m → Fin (n ∸ m)
+reduce≥′ : ∀ {m n} → .(m ℕ.≤ n) → (i : Fin n) → .(_ : toℕ i ≥ m) → Fin (n ∸ m)
 reduce≥′ {ℕ.zero} {n} m≤n i i≥m = i
-reduce≥′ {suc m} {suc n} m≤n (suc i) (s≤s i≥m) = reduce≥′ (pred-mono m≤n) i i≥m
+reduce≥′ {suc m} {suc n} m≤n (suc i) i≥m = reduce≥′ (pred-mono m≤n) i (pred-mono i≥m)
 
-private
-  insert′ : ∀ {a A m n} → Vec {a} A (n ∸ m) → m ℕ.≤ n → m ≢ 0 → (i : Fin (n ∸ ℕ.pred m)) → A → Vec A (n ∸ ℕ.pred m)
-  insert′ {a} {A} {ℕ.zero} {n} xs m≤n m≢0 i x = ⊥-elim (m≢0 refl)
-  insert′ {a} {A} {suc ℕ.zero} {suc _} xs _ _ F.zero x = x ∷ xs
-  insert′ {a} {A} {suc ℕ.zero} {suc (suc n)} (y ∷ xs) _ _ (suc i) x = y ∷ insert′ {m = suc ℕ.zero} {suc n} xs (s≤s z≤n) (λ ()) i x
-  insert′ {a} {A} {suc (suc m)} {suc ℕ.zero} xs m≤n _ i x = ⊥-elim (<⇒≱ (s≤s (s≤s z≤n)) m≤n)
-  insert′ {a} {A} {suc (suc m)} {suc (suc n)} xs m≤n _ i x = insert′ {m = suc m} xs (pred-mono m≤n) (λ ()) i x
+reduce≥′-mono : ∀ {m n} → .(m≤n : m ℕ.≤ n) → (i j : Fin n) → (i≥m : toℕ i ≥ m) → (i≤j : i F.≤ j) → reduce≥′ m≤n i i≥m F.≤ reduce≥′ m≤n j (≤-trans i≥m i≤j)
+reduce≥′-mono {ℕ.zero} {n} m≤n i j i≥m i≤j = i≤j
+reduce≥′-mono {suc m} {suc n} m≤n (suc i) (suc j) (s≤s i≥m) (s≤s i≤j) = reduce≥′-mono (pred-mono m≤n) i j i≥m i≤j
 
-  reduce≥′-mono : ∀ {m n} → .(m≤n : m ℕ.≤ n) → (i j : Fin n) → (i≥m : toℕ i ≥ m) → (i≤j : i F.≤ j) → reduce≥′ m≤n i i≥m F.≤ reduce≥′ m≤n j (≤-trans i≥m i≤j)
-  reduce≥′-mono {ℕ.zero} {n} m≤n i j i≥m i≤j = i≤j
-  reduce≥′-mono {suc m} {suc n} m≤n (suc i) (suc j) (s≤s i≥m) (s≤s i≤j) = reduce≥′-mono (pred-mono m≤n) i j i≥m i≤j
+insert′ : ∀ {a A m n} → Vec {a} A (n ∸ m) → .(m ℕ.≤ n) → m ≢ 0 → (i : Fin (n ∸ ℕ.pred m)) → A → Vec A (n ∸ ℕ.pred m)
+insert′ {a} {A} {ℕ.zero} xs m≤n m≢0 i x = ⊥-elim (m≢0 refl)
+insert′ {a} {A} {suc ℕ.zero} xs _ _ F.zero x = x ∷ xs
+insert′ {a} {A} {suc ℕ.zero} (y ∷ xs) _ _ (suc i) x = y ∷ insert′ xs (s≤s z≤n) (λ ()) i x
+insert′ {a} {A} {suc (suc m)} {suc ℕ.zero} xs m≤n _ i x = ⊥-elim (<⇒≱ (s≤s (s≤s z≤n)) (≤-recomputable m≤n))
+insert′ {a} {A} {suc (suc m)} {suc (suc _)} xs m≤n _ i x = insert′ {m = suc m} xs (pred-mono m≤n) (λ ()) i x
 
-  remove′ : ∀ {a A m} → Vec {a} A m → .(m ≢ 0) → Fin m → Vec A (ℕ.pred m)
-  remove′ (x ∷ xs) m≢0 F.zero = xs
-  remove′ (x ∷ y ∷ xs) m≢0 (suc i) = x ∷ remove′ (y ∷ xs) (λ ()) i
+rotate : ∀ {a A n} → (i j : Fin n) → .(i F.≤ j) → Vec {a} A n → Vec A n
+rotate F.zero j i≤j (x ∷ xs) = insert xs j x
+rotate (suc i) (suc j) i≤j (x ∷ xs) = x ∷ (rotate i j (pred-mono i≤j) xs)
 
-  rotate : ∀ {a A n} → (i j : Fin n) → .(i F.≤ j) → Vec {a} A n → Vec A n
-  rotate F.zero j i≤j (x ∷ xs) = insert xs j x
-  rotate (suc i) (suc j) i≤j (x ∷ xs) = x ∷ (rotate i j (pred-mono i≤j) xs)
+remove′ : ∀ {a A m} → Vec {a} A m → .(m ≢ 0) → Fin m → Vec A (ℕ.pred m)
+remove′ (x ∷ xs) m≢0 F.zero = xs
+remove′ (x ∷ y ∷ xs) m≢0 (suc i) = x ∷ remove′ (y ∷ xs) (λ ()) i
 
 record Context n : Set (c ⊔ lsuc ℓ) where
   field
