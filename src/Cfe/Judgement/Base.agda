@@ -21,7 +21,7 @@ data _⊢_∶_ : {n : ℕ} → Context n → Expression n → Type ℓ ℓ → S
   Eps : ∀ {n} {Γ,Δ : Context n} → Γ,Δ ⊢ ε ∶ Lift ℓ ℓ τε
   Char : ∀ {n} {Γ,Δ : Context n} c → Γ,Δ ⊢ Char c ∶ Lift ℓ ℓ τ[ c ]
   Bot : ∀ {n} {Γ,Δ : Context n} → Γ,Δ ⊢ ⊥ ∶ Lift ℓ ℓ τ⊥
-  Var : ∀ {n} {Γ,Δ : Context n} {i} (i≥m : toℕ i ≥ _) → Γ,Δ ⊢ Var i ∶ lookup (Context.Γ Γ,Δ) (reduce≥′ (Context.m≤n Γ,Δ) i i≥m)
+  Var : ∀ {n} {Γ,Δ : Context n} {i} (i≥m : toℕ i ≥ _) → Γ,Δ ⊢ Var i ∶ lookup (Context.Γ Γ,Δ) (reduce≥′ (Context.m≤n Γ,Δ) i≥m)
   Fix : ∀ {n} {Γ,Δ : Context n} {e τ} → cons Γ,Δ τ ⊢ e ∶ τ → Γ,Δ ⊢ μ e ∶ τ
   Cat : ∀ {n} {Γ,Δ : Context n} {e₁ e₂ τ₁ τ₂} → Γ,Δ ⊢ e₁ ∶ τ₁ → shift Γ,Δ ⊢ e₂ ∶ τ₂ → (τ₁⊛τ₂ : τ₁ ⊛ τ₂) → Γ,Δ ⊢ e₁ ∙ e₂ ∶ τ₁ ∙ₜ τ₂
   Vee : ∀ {n} {Γ,Δ : Context n} {e₁ e₂ τ₁ τ₂} → Γ,Δ ⊢ e₁ ∶ τ₁ → Γ,Δ ⊢ e₂ ∶ τ₂ → (τ₁#τ₂ : τ₁ # τ₂) → Γ,Δ ⊢ e₁ ∨ e₂ ∶ τ₁ ∨ₜ τ₂
