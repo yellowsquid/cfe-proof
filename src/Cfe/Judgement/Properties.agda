@@ -21,7 +21,7 @@ open import Data.Product
 open import Data.Vec
 open import Data.Vec.Properties
 open import Function
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality hiding (subst₂)
 open import Relation.Nullary
 
 private
@@ -33,10 +33,6 @@ private
   punchIn[i,j]≥m : ∀ {n m i j} → toℕ i ℕ.≤ m → toℕ j ≥ m → toℕ (punchIn {n} i j) ≥ suc m
   punchIn[i,j]≥m {i = zero} i≤m j≥m = s≤s j≥m
   punchIn[i,j]≥m {i = suc i} {suc j} (s≤s i≤m) (s≤s j≥m) = s≤s (punchIn[i,j]≥m i≤m j≥m)
-
-  punchOut≥m : ∀ {n m i j} → (i≢j : i ≢ j) → toℕ {suc n} i ≥ m → toℕ j ≥ m → toℕ (punchOut i≢j) ≥ m
-  punchOut≥m {m = zero} _ z≤n _ = z≤n
-  punchOut≥m {n = suc _} {.(suc _)} {suc _} {suc _} i≢j (s≤s i≥m) (s≤s j≥m) = s≤s (punchOut≥m (i≢j ∘ cong suc) i≥m j≥m)
 
 congᶜ : ∀ {n} {Γ,Δ Γ,Δ′ : Context n} {e τ} → Γ,Δ ≋ᶜ Γ,Δ′ → Γ,Δ ⊢ e ∶ τ → Γ,Δ′ ⊢ e ∶ τ
 congᶜ {Γ,Δ = Γ,Δ} {Γ,Δ′} (refl , refl , refl) Γ,Δ⊢e∶τ with ≤-irrelevant (Context.m≤n Γ,Δ) (Context.m≤n Γ,Δ′)
@@ -111,6 +107,10 @@ subst₁ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} {i = i} 
 ... | no i≢j =
   congᵗ (sym (τ≡τ′ Γ m≤n i≢j i≥m j≥m τ′)) (Var (punchOut≥m i≢j i≥m j≥m))
   where
+  punchOut≥m : ∀ {n m i j} → (i≢j : i ≢ j) → toℕ {suc n} i ≥ m → toℕ j ≥ m → toℕ (punchOut i≢j) ≥ m
+  punchOut≥m {m = zero} _ z≤n _ = z≤n
+  punchOut≥m {n = suc _} {.(suc _)} {suc _} {suc _} i≢j (s≤s i≥m) (s≤s j≥m) = s≤s (punchOut≥m (i≢j ∘ cong suc) i≥m j≥m)
+
   τ≡τ′ : ∀ {a A n m i j} xs (m≤n : m ℕ.≤ n) (i≢j : i ≢ j) (i≥m : toℕ i ≥ m) (j≥m : toℕ j ≥ m) x →
         lookup {a} {A} (insert′ xs (s≤s m≤n) (reduce≥′ (≤-step m≤n) i≥m) x) (reduce≥′ (≤-step m≤n) j≥m) ≡
         lookup xs (reduce≥′ m≤n (punchOut≥m i≢j i≥m j≥m))
@@ -130,3 +130,35 @@ subst₁ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} {i = i} 
 subst₁ {τ = τ} i≥m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ = Fix (subst₁ (s≤s i≥m) Γ,Δ⊢e∶τ (wkn₂ Γ,Δ⊢e′∶τ′ z≤n τ))
 subst₁ {Γ,Δ = Γ,Δ} {i = i} {τ′} i≥m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ = Cat (subst₁ i≥m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₁ z≤n (congᶜ (shift≤-wkn₁-comm Γ,Δ z≤n i≥m τ′) Δ++Γ,∙⊢e₂∶τ₂) (shift≤ Γ,Δ⊢e′∶τ′ z≤n)) τ₁⊛τ₂
 subst₁ i≥m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ = Vee (subst₁ i≥m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₁ i≥m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′) τ₁#τ₂
+
+
+subst₂ : ∀ {n} {Γ,Δ : Context n} {e τ i τ′} (i≤m : toℕ i ℕ.≤ _) → C.wkn₂ Γ,Δ i≤m τ′ ⊢ e ∶ τ → ∀ {e′} → shift Γ,Δ ⊢ e′ ∶ τ′ → Γ,Δ ⊢ e [ e′ / i ] ∶ τ
+subst₂ i≤m Eps Γ,Δ⊢e′∶τ′ = Eps
+subst₂ i≤m (Char c) Γ,Δ⊢e′∶τ′ = Char c
+subst₂ i≤m Bot Γ,Δ⊢e′∶τ′ = Bot
+subst₂ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} {i = i} i≤m (Var {i = j} j>m) Γ,Δ⊢e′∶τ′ with i F.≟ j
+... | yes refl = ⊥-elim (<⇒≱ j>m i≤m)
+... | no i≢j = congᵗ (cong (lookup Γ) (τ≡τ′ m≤n i≢j i≤m j>m)) (Var (punchOut≥m i≢j i≤m j>m))
+  where
+  punchOut≥m : ∀ {n m i j} → (i≢j : i ≢ j) → toℕ {suc n} i ℕ.≤ m → toℕ j > m → toℕ (punchOut i≢j) ≥ m
+  punchOut≥m {m = zero} i≢j i≤m j>m = z≤n
+  punchOut≥m {m = suc _} {zero} {suc _} _ _ (s≤s j>m) = j>m
+  punchOut≥m {n = suc _} {i = suc _} {suc _} i≢j (s≤s i≤m) (s≤s j>m) = s≤s (punchOut≥m (i≢j ∘ cong suc) i≤m j>m)
+
+  τ≡τ′ : ∀ {n m i j} (m≤n : m ℕ.≤ n) (i≢j : i ≢ j) (i≤m : toℕ i ℕ.≤ m) (j>m : toℕ j > m) →
+    reduce≥′ m≤n (punchOut≥m i≢j i≤m j>m) ≡ reduce≥′ (s≤s m≤n) j>m
+  τ≡τ′ {m = zero} {zero} {suc _} m≤n i≢j z≤n (s≤s z≤n) = refl
+  τ≡τ′ {m = suc _} {zero} {suc _} m≤n i≢j z≤n (s≤s j>m) = refl
+  τ≡τ′ {n = suc _} {i = suc _} {suc _} (s≤s m≤n) i≢j (s≤s i≤m) (s≤s j>m) = τ≡τ′ m≤n (i≢j ∘ cong suc) i≤m j>m
+
+subst₂ {Γ,Δ = Γ,Δ} {τ = τ} {τ′ = τ′} i≤m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ =
+  Fix (subst₂ (s≤s i≤m)
+              (congᶜ (≋ᶜ-sym (wkn₂-comm Γ,Δ z≤n i≤m τ τ′)) Γ,Δ⊢e∶τ)
+              (congᶜ (≋ᶜ-sym (shift≤-wkn₂-comm-≤ Γ,Δ z≤n z≤n τ)) (wkn₁ Γ,Δ⊢e′∶τ′ z≤n τ)))
+subst₂ {Γ,Δ = Γ,Δ} {τ′ = τ′} i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ =
+  Cat (subst₂ i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
+      (subst₁ z≤n
+              (congᶜ (shift≤-wkn₂-comm-≤ Γ,Δ z≤n i≤m τ′) Δ++Γ,∙⊢e₂∶τ₂)
+              Γ,Δ⊢e′∶τ′)
+      τ₁⊛τ₂
+subst₂ i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ = Vee (subst₂ i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₂ i≤m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′) τ₁#τ₂
