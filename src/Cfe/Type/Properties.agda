@@ -67,6 +67,15 @@ L⊨τ+¬N⇒ε∉L {L = L} {τ} L⊨τ ¬n ε∈L = case ∃[ b ] ((null L → 
   open _≤_ τ₁≤τ₂
   module A⊨τ₁ = _⊨_ A⊨τ₁
 
+⊨-liftˡ : ∀ {a fℓ lℓ} {L : Language a} {τ : Type fℓ lℓ} b → L ⊨ τ → Lift b L ⊨ τ
+⊨-liftˡ _ L⊨τ = record
+  { n⇒n = λ { ( L.lift ε∈L ) → n⇒n ε∈L }
+  ; f⇒f = λ { ( l , L.lift xl∈L ) → f⇒f (-, xl∈L)}
+  ; l⇒l = λ { ( l , l≢[] , L.lift l∈L , l′ , L.lift lxl′∈L ) → l⇒l (-, l≢[] , l∈L , -, lxl′∈L)}
+  }
+  where
+  open _⊨_ L⊨τ
+
 L⊨τ⊥⇒L≈∅ : ∀ {a} {L : Language a} → L ⊨ τ⊥ → L ≈ˡ ∅
 L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
   { f = λ {l} → elim l

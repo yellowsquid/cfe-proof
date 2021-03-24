@@ -55,29 +55,29 @@ isSemiring n = record
       { isSemigroup = record
         { isMagma = record
           { isEquivalence = isEquivalence n
-          ; ∙-cong = λ x≋y u≋v γ → ∙-mon.∙-cong (x≋y γ) (u≋v γ)
+          ; ∙-cong = λ x≋y u≋v γ → ∙.∙-cong {c ⊔ ℓ} (x≋y γ) (u≋v γ)
           }
-        ; assoc = λ x y z γ → ∙-mon.assoc (⟦ x ⟧ γ) (⟦ y ⟧ γ) (⟦ z ⟧ γ)
+        ; assoc = λ x y z γ → ∙.∙-assoc (⟦ x ⟧ γ) (⟦ y ⟧ γ) (⟦ z ⟧ γ)
         }
-      ; identity = (λ x γ → ∙-mon.identityˡ (⟦ x ⟧ γ)) , (λ x γ → ∙-mon.identityʳ (⟦ x ⟧ γ))
+      ; identity = (λ x γ → ∙.∙-identityˡ {ℓ} (⟦ x ⟧ γ)) , (λ x γ → ∙.∙-identityʳ {ℓ} (⟦ x ⟧ γ))
       }
     ; distrib = (λ x y z γ → record
       { f = λ
-        { (l₁ , l₁∈⟦x⟧ , l₂ , inj₁ l₂∈⟦y⟧ , l₁++l₂≡l) → inj₁ (-, l₁∈⟦x⟧ , -, l₂∈⟦y⟧ , l₁++l₂≡l)
-        ; (l₁ , l₁∈⟦x⟧ , l₂ , inj₂ l₂∈⟦z⟧ , l₁++l₂≡l) → inj₂ (-, l₁∈⟦x⟧ , -, l₂∈⟦z⟧ , l₁++l₂≡l)
+        { record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₁ l₂∈⟦y⟧ ; eq = eq } → inj₁ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦y⟧ ; eq = eq }
+        ; record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₂ l₂∈⟦z⟧ ; eq = eq } → inj₂ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦z⟧ ; eq = eq }
         }
       ; f⁻¹ = λ
-        { (inj₁ (l₁ , l₁∈⟦x⟧ , l₂ , l₂∈⟦y⟧ , l₁++l₂≡l)) → -, l₁∈⟦x⟧ , -, inj₁ l₂∈⟦y⟧ , l₁++l₂≡l
-        ; (inj₂ (l₁ , l₁∈⟦x⟧ , l₂ , l₂∈⟦z⟧ , l₁++l₂≡l)) → -, l₁∈⟦x⟧ , -, inj₂ l₂∈⟦z⟧ , l₁++l₂≡l
+        { (inj₁ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦y⟧ ; eq = eq }) → record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₁ l₂∈⟦y⟧ ; eq = eq }
+        ; (inj₂ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦z⟧ ; eq = eq }) → record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₂ l₂∈⟦z⟧ ; eq = eq }
         }
       }) , (λ x y z γ → record
       { f = λ
-        { (l₁ , inj₁ l₁∈⟦y⟧ , l₂ , l₂∈⟦x⟧ , l₁++l₂≡l) → inj₁ (-, l₁∈⟦y⟧ , -, l₂∈⟦x⟧ , l₁++l₂≡l)
-        ; (l₁ , inj₂ l₁∈⟦z⟧ , l₂ , l₂∈⟦x⟧ , l₁++l₂≡l) → inj₂ (-, l₁∈⟦z⟧ , -, l₂∈⟦x⟧ , l₁++l₂≡l)
+        { record { l₁∈A = inj₁ l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq } → inj₁ record { l₁∈A = l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
+        ; record { l₁∈A = inj₂ l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq } → inj₂ record { l₁∈A = l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
         }
       ; f⁻¹ = λ
-        { (inj₁ (l₁ , l₁∈⟦y⟧ , l₂ , l₂∈⟦x⟧ , l₁++l₂≡l)) → -, inj₁ l₁∈⟦y⟧ , -, l₂∈⟦x⟧ , l₁++l₂≡l
-        ; (inj₂ (l₁ , l₁∈⟦z⟧ , l₂ , l₂∈⟦x⟧ , l₁++l₂≡l)) → -, inj₂ l₁∈⟦z⟧ , -, l₂∈⟦x⟧ , l₁++l₂≡l
+        { (inj₁ record { l₁∈A = l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }) → record { l₁∈A = inj₁ l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
+        ; (inj₂ record { l₁∈A = l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }) → record { l₁∈A = inj₂ l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
         }
       })
     }
@@ -91,7 +91,6 @@ isSemiring n = record
   }
   where
   module ∪-comm = IsCommutativeMonoid (∪.isCommutativeMonoid {c ⊔ ℓ})
-  module ∙-mon = IsMonoid (∙.isMonoid {ℓ})
 
 module _ where
   open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE

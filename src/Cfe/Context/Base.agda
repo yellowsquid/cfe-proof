@@ -54,6 +54,11 @@ record Context n : Set (c ⊔ lsuc ℓ) where
     Γ : Vec (Type ℓ ℓ) (n ∸ m)
     Δ : Vec (Type ℓ ℓ) m
 
+
+toVec : ∀ {n} → Context n → Vec (Type ℓ ℓ) n
+toVec record { m = .0 ; m≤n = _ ; Γ = Γ ; Δ = [] } = Γ
+toVec {suc n} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } = x ∷ toVec (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ })
+
 wkn₁ : ∀ {n i} → (Γ,Δ : Context n) → toℕ {suc n} i ≥ Context.m Γ,Δ → Type ℓ ℓ → Context (suc n)
 wkn₁ Γ,Δ i≥m τ = record
   { m≤n = ≤-step m≤n

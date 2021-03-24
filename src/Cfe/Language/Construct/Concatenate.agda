@@ -179,8 +179,36 @@ module _
   where
   module X = Language X
 
-∙-unique-prefix : ∀ {a b} (A : Language a) (B : Language b) → Empty (flast A ∩ first B) → ¬ (null A) → ∀ {l} → (l∈A∙B l∈A∙B′ : l ∈ A ∙ B) → Concat.l₁ l∈A∙B ≋ Concat.l₁ l∈A∙B′ × Concat.l₂ l∈A∙B ≋ Concat.l₂ l∈A∙B′
-∙-unique-prefix A B ∄[l₁∩f₂] ¬n₁ l∈A∙B l∈A∙B′ with Compare.compare (Concat.l₁ l∈A∙B) (Concat.l₂ l∈A∙B) (Concat.l₁ l∈A∙B′) (Concat.l₂ l∈A∙B′) (≋-trans (Concat.eq l∈A∙B) (≋-sym (Concat.eq l∈A∙B′)))
+∙-identityʳ : ∀ {a} → RightIdentity _≈_ (𝕃.Lift (ℓ ⊔ a) ｛ε｝) _∙_
+∙-identityʳ X = record
+  { f = λ
+    { record { l₁ = l₁ ; l₂ = [] ; l₁∈A = l∈X ; eq = eq } → X.∈-resp-≋ (≋-trans (≋-sym (≋-reflexive (++-identityʳ l₁))) eq) l∈X
+    }
+  ; f⁻¹ = λ {l} l∈X → record
+    { l₁∈A = l∈X
+    ; l₂∈B = lift ≡.refl
+    ; eq = ≋-reflexive (++-identityʳ l)
+    }
+  }
+  where
+  module X = Language X
+
+∙-mono : ∀ {a b} → _∙_ Preserves₂ _≤_ {a} ⟶ _≤_ {b} ⟶ _≤_
+∙-mono X≤Y U≤V = record
+  { f = λ
+    { record { l₁∈A = l₁∈A ; l₂∈B = l₂∈B ; eq = eq } → record
+      { l₁∈A = X≤Y.f l₁∈A
+      ; l₂∈B = U≤V.f l₂∈B
+      ; eq = eq
+      }
+    }
+  }
+  where
+  module X≤Y = _≤_ X≤Y
+  module U≤V = _≤_ U≤V
+
+∙-unique : ∀ {a b} (A : Language a) (B : Language b) → Empty (flast A ∩ first B) → ¬ (null A) → ∀ {l} → (l∈A∙B l∈A∙B′ : l ∈ A ∙ B) → Concat.l₁ l∈A∙B ≋ Concat.l₁ l∈A∙B′ × Concat.l₂ l∈A∙B ≋ Concat.l₂ l∈A∙B′
+∙-unique A B ∄[l₁∩f₂] ¬n₁ l∈A∙B l∈A∙B′ with Compare.compare (Concat.l₁ l∈A∙B) (Concat.l₂ l∈A∙B) (Concat.l₁ l∈A∙B′) (Concat.l₂ l∈A∙B′) (≋-trans (Concat.eq l∈A∙B) (≋-sym (Concat.eq l∈A∙B′)))
 ... | cmp with Compare.<?> cmp
 ... | tri< l _ _ = ⊥-elim (∄[l₁∩f₂] w ((-, (λ { ≡.refl → ¬n₁ (Concat.l₁∈A l∈A∙B′)}) , (Concat.l₁∈A l∈A∙B′) , -, A.∈-resp-≋ eq₃ (Concat.l₁∈A l∈A∙B)) , (-, B.∈-resp-≋ (≋-sym eq₄) (Concat.l₂∈B l∈A∙B′))))
   where
@@ -199,20 +227,6 @@ module _
   w = proj₁ rsplit
   eq₃ = (proj₁ ∘ proj₂ ∘ proj₂) rsplit
   eq₄ = (proj₂ ∘ proj₂ ∘ proj₂) rsplit
-
-∙-identityʳ : ∀ {a} → RightIdentity _≈_ (𝕃.Lift (ℓ ⊔ a) ｛ε｝) _∙_
-∙-identityʳ X = record
-  { f = λ
-    { record { l₁ = l₁ ; l₂ = [] ; l₁∈A = l∈X ; eq = eq } → X.∈-resp-≋ (≋-trans (≋-sym (≋-reflexive (++-identityʳ l₁))) eq) l∈X
-    }
-  ; f⁻¹ = λ {l} l∈X → record
-    { l₁∈A = l∈X
-    ; l₂∈B = lift ≡.refl
-    ; eq = ≋-reflexive (++-identityʳ l)
-    }
-  }
-  where
-  module X = Language X
 
 isMagma : ∀ {a} → IsMagma _≈_ (_∙_ {c ⊔ ℓ ⊔ a})
 isMagma {a} = record

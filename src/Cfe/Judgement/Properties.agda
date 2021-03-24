@@ -12,15 +12,19 @@ open import Cfe.Context over as C
   renaming (_≋_ to _≋ᶜ_; ≋-sym to ≋ᶜ-sym; ≋-trans to ≋ᶜ-trans )
 open import Cfe.Expression over as E
 open import Cfe.Judgement.Base over
+open import Cfe.Type over
+open import Cfe.Type.Construct.Lift over
 open import Data.Empty
 open import Data.Fin as F hiding (splitAt)
 open import Data.Fin.Properties hiding (≤-refl; ≤-trans; ≤-irrelevant)
-open import Data.Nat as ℕ
+open import Data.Nat as ℕ hiding (_⊔_)
 open import Data.Nat.Properties
 open import Data.Product
 open import Data.Vec
 open import Data.Vec.Properties
+import Data.Vec.Relation.Binary.Pointwise.Extensional as PW
 open import Function
+open import Level renaming (suc to lsuc)
 open import Relation.Binary.PropositionalEquality hiding (subst₂)
 open import Relation.Nullary
 
@@ -162,3 +166,17 @@ subst₂ {Γ,Δ = Γ,Δ} {τ′ = τ′} i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,
               Γ,Δ⊢e′∶τ′)
       τ₁⊛τ₂
 subst₂ i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ = Vee (subst₂ i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₂ i≤m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′) τ₁#τ₂
+
+soundness : ∀ {n} {Γ,Δ : Context n} {e τ} → Γ,Δ ⊢ e ∶ τ → ∀ γ → PW.Pointwise _⊨_ γ (toVec Γ,Δ) → ⟦ e ⟧ γ ⊨ τ
+soundness Eps γ γ⊨Γ,Δ = ⊨-liftˡ ℓ (⊨-liftʳ ℓ ℓ (｛ε｝⊨τε))
+soundness (Char c) γ γ⊨Γ,Δ = ⊨-liftˡ ℓ (⊨-liftʳ ℓ ℓ (｛c｝⊨τ[c] c))
+soundness Bot γ γ⊨Γ,Δ = ⊨-liftˡ (c ⊔ ℓ) (⊨-liftʳ ℓ ℓ (∅⊨τ⊥))
+soundness {Γ,Δ = Γ,Δ} (Var {i = i} i≥m) γ γ⊨Γ,Δ = subst (⟦ Var i ⟧ γ ⊨_) (sym (τ≡τ′ Γ,Δ i≥m)) (PW.Pointwise.app γ⊨Γ,Δ i)
+  where
+  τ≡τ′ : ∀ {n i} (Γ,Δ : Context n) i≥m → lookup (Context.Γ Γ,Δ) (reduce≥′ {i = i} (Context.m≤n Γ,Δ) i≥m) ≡ lookup (toVec Γ,Δ) i
+  τ≡τ′ {.(suc _)} record { m = .0 ; m≤n = z≤n ; Γ = (x ∷ Γ) ; Δ = [] } i≥m = refl
+  τ≡τ′ {.(suc _)} {suc i} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } (s≤s i≥m) = τ≡τ′ (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ}) i≥m
+-- ⋃ (λ X → ⟦ e ⟧ (X ∷ y)) ⊨ τ
+soundness (Fix Γ,Δ⊢e∶τ) γ γ⊨Γ,Δ = {!!}
+soundness (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) γ γ⊨Γ,Δ = {!!}
+soundness (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ,Δ = {!!}
