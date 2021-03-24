@@ -26,10 +26,11 @@ module _
   (B : Language b)
   where
 
-  module A = Language A
-  module B = Language B
+  private
+    module A = Language A
+    module B = Language B
 
-  infix 4 _∙_
+  infix 7 _∙_
 
   Concat : List C → Set (c ⊔ ℓ ⊔ a ⊔ b)
   Concat l = ∃[ l₁ ] l₁ ∈ A × ∃[ l₂ ] l₂ ∈ B × l₁ ++ l₂ ≋ l
