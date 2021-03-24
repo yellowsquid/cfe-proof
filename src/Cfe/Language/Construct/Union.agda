@@ -69,6 +69,12 @@ isCommutativeMonoid = record
     }
   }
 
+∪-idem : ∀ {a} → Idempotent 𝕃._≈_ (_∪_ {a})
+∪-idem A = record
+  { f = [ id , id ]′
+  ; f⁻¹ = inj₁
+  }
+
 ∪-mono : ∀ {a b} → _∪_ Preserves₂ _≤_ {a} ⟶ _≤_ {b} ⟶ _≤_
 ∪-mono X≤Y U≤V = record
   { f = Sum.map X≤Y.f U≤V.f
