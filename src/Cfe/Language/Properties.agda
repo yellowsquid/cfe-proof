@@ -13,7 +13,7 @@ open import Cfe.Language.Base over
 open import Data.List
 open import Data.List.Relation.Binary.Equality.Setoid over
 open import Function
-open import Level
+open import Level hiding (Lift)
 
 ≈-refl : ∀ {a} → Reflexive (_≈_ {a})
 ≈-refl {x = A} = record
@@ -94,3 +94,9 @@ setoid a = record { isEquivalence = ≈-isEquivalence {a} }
 
 poset : ∀ a → Poset (c ⊔ ℓ ⊔ suc a) (c ⊔ ℓ ⊔ a) (c ⊔ a)
 poset a = record { isPartialOrder = ≤-isPartialOrder a }
+
+lift-cong : ∀ {a} b (L : Language a) → Lift b L ≈ L
+lift-cong b L = record
+  { f = lower
+  ; f⁻¹ = lift
+  }

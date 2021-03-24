@@ -8,10 +8,11 @@ module Cfe.Type.Base
 
 open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 
-open import Cfe.Language over
-open import Data.Bool as 𝔹 hiding (_∨_)
+open import Cfe.Language over hiding (_≤_; _≈_)
+open import Data.Bool as 𝔹 hiding (_∨_) renaming (_≤_ to _≤ᵇ_)
 open import Level as L renaming (suc to lsuc)
 open import Relation.Unary as U
+open import Relation.Binary.PropositionalEquality using (_≡_)
 
 infix 7 _∙_
 infix 6 _∨_
@@ -69,3 +70,23 @@ record _#_ {fℓ₁} {lℓ₁} {fℓ₂} {lℓ₂} (τ₁ : Type fℓ₁ lℓ₁
   field
     ∄[f₁∩f₂] : Empty (τ₁.First ∩ τ₂.First)
     ¬n₁∨¬n₂ : T (not (τ₁.Null 𝔹.∨ τ₂.Null))
+
+record _≤_ {fℓ₁} {lℓ₁} {fℓ₂} {lℓ₂} (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ fℓ₁ ⊔ lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂) where
+  module τ₁ = Type τ₁
+  module τ₂ = Type τ₂
+
+  field
+    n≤n : τ₁.Null ≤ᵇ τ₂.Null
+    f⊆f : τ₁.First ⊆ τ₂.First
+    l⊆l : τ₁.Flast ⊆ τ₂.Flast
+
+record _≈_ {fℓ₁} {lℓ₁} {fℓ₂} {lℓ₂} (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ fℓ₁ ⊔ lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂) where
+  module τ₁ = Type τ₁
+  module τ₂ = Type τ₂
+
+  field
+    n≡n : τ₁.Null ≡ τ₂.Null
+    f₁⊆f₂ : τ₁.First ⊆ τ₂.First
+    f₁⊇f₂ : τ₁.First ⊇ τ₂.First
+    l₁⊆l₂ : τ₁.Flast ⊆ τ₂.Flast
+    l₁⊇l₂ : τ₁.Flast ⊇ τ₂.Flast

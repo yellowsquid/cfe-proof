@@ -1,6 +1,6 @@
 {-# OPTIONS --without-K --safe #-}
 
-open import Relation.Binary using (Setoid)
+open import Relation.Binary
 
 module Cfe.Type.Properties
   {c ℓ} (over : Setoid c ℓ)
@@ -8,36 +8,62 @@ module Cfe.Type.Properties
 
 open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 
-open import Cfe.Language over
+open import Algebra
+open import Cfe.Language over renaming (_≤_ to _≤ˡ_; _≈_ to _≈ˡ_; ≤-min to ≤ˡ-min)
 open import Cfe.Language.Construct.Concatenate over renaming (_∙_ to _∙ˡ_)
 open import Cfe.Language.Construct.Single over
 open import Cfe.Language.Construct.Union over
+open import Cfe.Language.Indexed.Construct.Iterate over
 open import Cfe.Type.Base over
-open import Data.Bool hiding (_≤_) renaming (_∨_ to _∨ᵇ_)
-open import Data.Bool.Properties
+open import Data.Bool renaming (_≤_ to _≤ᵇ_; _∨_ to _∨ᵇ_)
+open import Data.Bool.Properties hiding (≤-reflexive)
 open import Data.Empty
 open import Data.List hiding (null)
 open import Data.List.Relation.Binary.Equality.Setoid over
+open import Data.Nat hiding (_≤_; _≤ᵇ_; _^_)
 open import Data.Product as Product
 open import Data.Sum as Sum
-open import Function
+open import Function hiding (_⟶_)
+open import Relation.Unary.Properties
 open import Relation.Binary.PropositionalEquality
 
-⊨-anticongˡ : ∀ {a b fℓ lℓ} {A : Language a} {B : Language b} {τ : Type fℓ lℓ} → B ≤ A → A ⊨ τ → B ⊨ τ
+≤-min : ∀ {fℓ lℓ} → Min (_≤_ {_} {_} {fℓ} {lℓ}) τ⊥
+≤-min τ = record
+  { n≤n = ≤-minimum τ.Null
+  ; f⊆f = λ ()
+  ; l⊆l = λ ()
+  }
+  where
+  module τ = Type τ
+
+L⊨τ+¬N⇒ε∉L : ∀ {a fℓ lℓ} {L : Language a} {τ : Type fℓ lℓ} → L ⊨ τ → T (not (Type.Null τ)) → [] ∉ L
+L⊨τ+¬N⇒ε∉L {L = L} {τ} L⊨τ ¬n ε∈L = case ∃[ b ] ((null L → T b) × T (not b)) ∋ Null τ , _⊨_.n⇒n L⊨τ , ¬n of λ
+  { (false , n⇒n , _) → n⇒n ε∈L }
+
+⊨-anticongˡ : ∀ {a b fℓ lℓ} {A : Language a} {B : Language b} {τ : Type fℓ lℓ} → B ≤ˡ A → A ⊨ τ → B ⊨ τ
 ⊨-anticongˡ B≤A A⊨τ = record
   { n⇒n = A⊨τ.n⇒n ∘ B≤A.f
   ; f⇒f = A⊨τ.f⇒f ∘ Product.map₂ B≤A.f
   ; l⇒l = A⊨τ.l⇒l ∘ Product.map₂ (Product.map₂ (Product.map₂ B≤A.f))
   }
   where
-  module B≤A = _≤_ B≤A
+  module B≤A = _≤ˡ_ B≤A
   module A⊨τ = _⊨_ A⊨τ
 
-L⊨τ+¬N⇒ε∉L : ∀ {a fℓ lℓ} {L : Language a} {τ : Type fℓ lℓ} → L ⊨ τ → T (not (Type.Null τ)) → [] ∉ L
-L⊨τ+¬N⇒ε∉L {L = L} {τ} L⊨τ ¬n ε∈L = case ∃[ b ] ((null L → T b) × T (not b)) ∋ Null τ , _⊨_.n⇒n L⊨τ , ¬n of λ
-  { (false , n⇒n , _) → n⇒n ε∈L }
+⊨-congʳ : ∀ {a fℓ₁ lℓ₁ fℓ₂ lℓ₂} {A : Language a} → (A ⊨_) ⟶ (A ⊨_) Respects (_≤_ {fℓ₁} {lℓ₁} {fℓ₂} {lℓ₂})
+⊨-congʳ {A = A} τ₁≤τ₂ A⊨τ₁ = record
+  { n⇒n = λ ε∈A → case ∃[ b ] (null A → T b) × ∃[ b′ ] b ≤ᵇ b′ ∋ τ₁.Null , A⊨τ₁.n⇒n , τ₂.Null , n≤n return (λ (_ , _ , x , _) → T x) of λ
+    { (_ , _ , true , _) → _
+    ; (false , n⇒n , false , _) → n⇒n ε∈A
+    }
+  ; f⇒f = f⊆f ∘ A⊨τ₁.f⇒f
+  ; l⇒l = l⊆l ∘ A⊨τ₁.l⇒l
+  }
+  where
+  open _≤_ τ₁≤τ₂
+  module A⊨τ₁ = _⊨_ A⊨τ₁
 
-L⊨τ⊥⇒L≈∅ : ∀ {a} {L : Language a} → L ⊨ τ⊥ → L ≈ ∅
+L⊨τ⊥⇒L≈∅ : ∀ {a} {L : Language a} → L ⊨ τ⊥ → L ≈ˡ ∅
 L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
   { f = λ {l} → elim l
   ; f⁻¹ = λ ()
@@ -56,7 +82,7 @@ L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
   ; l⇒l = λ ()
   }
 
-L⊨τε⇒L≤｛ε｝ : ∀ {a} {L : Language a} → L ⊨ τε → L ≤ ｛ε｝
+L⊨τε⇒L≤｛ε｝ : ∀ {a} {L : Language a} → L ⊨ τε → L ≤ˡ ｛ε｝
 L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
   { f = λ {l} → elim l
   }
@@ -125,3 +151,14 @@ L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
   where
   module A⊨τ₁ = _⊨_ A⊨τ₁
   module B⊨τ₂ = _⊨_ B⊨τ₂
+
+⋃-⊨ : ∀ {a fℓ lℓ} {F : Op₁ (Language a)} {τ : Type fℓ lℓ} → (∀ {L} → L ⊨ τ → F L ⊨ τ) → ⋃ F ⊨ τ
+⋃-⊨ {a} {F = F} {τ} mono = record
+  { n⇒n = λ { (n , l∈F^n) → _⊨_.n⇒n (F^n⊨τ n) l∈F^n}
+  ; f⇒f = λ { (_ , n , x∷l∈F^n) → _⊨_.f⇒f (F^n⊨τ n) (-, x∷l∈F^n) }
+  ; l⇒l = λ { (_ , l≢ε , _ , n , l++x∷l′∈F^n) → _⊨_.l⇒l (F^n⊨τ n) (-, l≢ε , -, l++x∷l′∈F^n) }
+  }
+  where
+  F^n⊨τ : ∀ n → (F ^ n) (Lift a ∅) ⊨ τ
+  F^n⊨τ zero = ⊨-anticongˡ (≤-reflexive (lift-cong a ∅)) (⊨-congʳ (≤-min τ) ∅⊨τ⊥)
+  F^n⊨τ (suc n) = mono (F^n⊨τ n)
