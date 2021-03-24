@@ -11,15 +11,15 @@ open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 open import Cfe.Language over
 open import Cfe.Language.Construct.Concatenate over renaming (_∙_ to _∙ˡ_)
 open import Cfe.Language.Construct.Single over
+open import Cfe.Language.Construct.Union over
 open import Cfe.Type.Base over
-open import Data.Bool hiding (_≤_)
+open import Data.Bool hiding (_≤_) renaming (_∨_ to _∨ᵇ_)
 open import Data.Bool.Properties
 open import Data.Empty
 open import Data.List hiding (null)
 open import Data.List.Relation.Binary.Equality.Setoid over
 open import Data.Product as Product
 open import Data.Sum as Sum
-open import Data.Unit hiding (_≤_)
 open import Function
 open import Relation.Binary.PropositionalEquality
 
@@ -32,6 +32,10 @@ open import Relation.Binary.PropositionalEquality
   where
   module B≤A = _≤_ B≤A
   module A⊨τ = _⊨_ A⊨τ
+
+L⊨τ+¬N⇒ε∉L : ∀ {a fℓ lℓ} {L : Language a} {τ : Type fℓ lℓ} → L ⊨ τ → T (not (Type.Null τ)) → [] ∉ L
+L⊨τ+¬N⇒ε∉L {L = L} {τ} L⊨τ ¬n ε∈L = case ∃[ b ] ((null L → T b) × T (not b)) ∋ Null τ , _⊨_.n⇒n L⊨τ , ¬n of λ
+  { (false , n⇒n , _) → n⇒n ε∈L }
 
 L⊨τ⊥⇒L≈∅ : ∀ {a} {L : Language a} → L ⊨ τ⊥ → L ≈ ∅
 L⊨τ⊥⇒L≈∅ {L = L} L⊨τ⊥ = record
@@ -87,9 +91,9 @@ L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
 ∙-⊨ : ∀ {a b fℓ₁ lℓ₁ fℓ₂ lℓ₂} {A : Language a} {B : Language b} {τ₁ : Type fℓ₁ lℓ₁} {τ₂ : Type fℓ₂ lℓ₂} →
       A ⊨ τ₁ → B ⊨ τ₂ → τ₁ ⊛ τ₂ → A ∙ˡ B ⊨ τ₁ ∙ τ₂
 ∙-⊨ {A = A} {B} {τ₁} {τ₂} A⊨τ₁ B⊨τ₂ τ₁⊛τ₂ = record
-  { n⇒n = λ { ([] , l∈A , _) → ⊥-elim (¬n₁ l∈A) }
+  { n⇒n = λ { ([] , l∈A , _) → ⊥-elim (L⊨τ+¬N⇒ε∉L A⊨τ₁ τ₁⊛τ₂.¬n₁ l∈A) }
   ; f⇒f = λ
-    { (_ , [] , l∈A , l′ , l′∈B , _) → ⊥-elim (¬n₁ l∈A)
+    { (_ , [] , l∈A , l′ , l′∈B , _) → ⊥-elim (L⊨τ+¬N⇒ε∉L A⊨τ₁ τ₁⊛τ₂.¬n₁ l∈A)
     ; (_ , x ∷ l , l∈A , l′ , l′∈B , x≈x ∷ _) → inj₁ (A⊨τ₁.f⇒f (l , A.∈-resp-≋ (x≈x ∷ ≋-refl) l∈A))
     }
   ; l⇒l = {!!}
@@ -100,7 +104,24 @@ L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
   module B⊨τ₂ = _⊨_ B⊨τ₂
   module τ₁⊛τ₂ = _⊛_ τ₁⊛τ₂
 
-  ¬n₁ : null A → ⊥
-  ¬n₁ ε∈A = case ∃[ b ] ((null A → T b) × T (not b)) ∋ Null τ₁ , A⊨τ₁.n⇒n , τ₁⊛τ₂.¬n₁ of λ
-    { (false , n⇒n , _) → n⇒n ε∈A
+∪-⊨ : ∀ {a b fℓ₁ lℓ₁ fℓ₂ lℓ₂} {A : Language a} {B : Language b} {τ₁ : Type fℓ₁ lℓ₁} {τ₂ : Type fℓ₂ lℓ₂} →
+      A ⊨ τ₁ → B ⊨ τ₂ → A ∪ B ⊨ τ₁ ∨ τ₂
+∪-⊨ {A = A} {B} {τ₁} {τ₂} A⊨τ₁ B⊨τ₂ = record
+  { n⇒n = λ
+    { (inj₁ ε∈A) → case ∃[ b ] T b ∋ Null τ₁ , A⊨τ₁.n⇒n ε∈A return (λ {(x , _) → T (x ∨ᵇ Null τ₂)}) of λ
+      { (true , _) → _ }
+    ; (inj₂ ε∈B) → case ∃[ b ] T b ∋ Null τ₂ , B⊨τ₂.n⇒n ε∈B return (λ {(x , _) → T (Null τ₁ ∨ᵇ x)}) of λ
+      { (true , _) → subst T (sym (∨-zeroʳ (Null τ₁))) _ }
     }
+  ; f⇒f = λ
+    { (l , inj₁ x∷l∈A) → inj₁ (A⊨τ₁.f⇒f (-, x∷l∈A))
+    ; (l , inj₂ x∷l∈B) → inj₂ (B⊨τ₂.f⇒f (-, x∷l∈B))
+    }
+  ; l⇒l = λ
+    { (l , l≢ε , l′ , inj₁ l++x∷l′∈A ) → inj₁ (A⊨τ₁.l⇒l (-, l≢ε , -, l++x∷l′∈A))
+    ; (l , l≢ε , l′ , inj₂ l++x∷l′∈B ) → inj₂ (B⊨τ₂.l⇒l (-, l≢ε , -, l++x∷l′∈B))
+    }
+  }
+  where
+  module A⊨τ₁ = _⊨_ A⊨τ₁
+  module B⊨τ₂ = _⊨_ B⊨τ₂

@@ -24,8 +24,9 @@ module _
   (B : Language b)
   where
 
-  module A = Language A
-  module B = Language B
+  private
+    module A = Language A
+    module B = Language B
 
   infix 6 _∪_
 
