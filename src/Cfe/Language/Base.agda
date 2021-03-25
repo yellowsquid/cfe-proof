@@ -68,4 +68,4 @@ first : ∀ {a} → Language a → C → Set (c ⊔ a)
 first A x = ∃[ l ] x ∷ l ∈ A
 
 flast : ∀ {a} → Language a → C → Set (c ⊔ a)
-flast A x = ∃[ l ] (l ≢ [] × ∃[ l′ ] l ++ x ∷ l′ ∈ A)
+flast A x = ∃[ l ] (l ≢ [] × l ∈ A × ∃[ l′ ] l ++ x ∷ l′ ∈ A)
