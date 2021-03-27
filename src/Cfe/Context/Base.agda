@@ -54,6 +54,8 @@ record Context n : Set (c ⊔ lsuc ℓ) where
     Γ : Vec (Type ℓ ℓ) (n ∸ m)
     Δ : Vec (Type ℓ ℓ) m
 
+∙,∙ : Context 0
+∙,∙ = record { m≤n = z≤n ; Γ = [] ; Δ = [] }
 
 toVec : ∀ {n} → Context n → Vec (Type ℓ ℓ) n
 toVec record { m = .0 ; m≤n = _ ; Γ = Γ ; Δ = [] } = Γ

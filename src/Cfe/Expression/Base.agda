@@ -88,3 +88,12 @@ rotate (μ e) i j i≤j = μ (rotate e (suc i) (suc j) (s≤s i≤j))
 
 _≋_ : {n : ℕ} → Expression n → Expression n → Set (lsuc (c ⊔ ℓ))
 e₁ ≋ e₂ = ∀ γ → ⟦ e₁ ⟧ γ 𝕃.≈ ⟦ e₂ ⟧ γ
+
+rank : {n : ℕ} → Expression n → ℕ
+rank ⊥ = 0
+rank ε = 0
+rank (Char _) = 0
+rank (e₁ ∨ e₂) = suc (rank e₁ ℕ.+ rank e₂)
+rank (e₁ ∙ _) = suc (rank e₁)
+rank (Var _) = 0
+rank (μ e) = suc (rank e)

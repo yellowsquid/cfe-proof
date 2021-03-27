@@ -189,3 +189,24 @@ soundness (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ
   ∪-⊨ (soundness Γ,Δ⊢e₁∶τ₁ γ γ⊨Γ,Δ)
       (soundness Γ,Δ⊢e₂∶τ₂ γ γ⊨Γ,Δ)
       τ₁#τ₂
+
+subst-preserves-rank : ∀ {n} {Γ,Δ : Context n} {e τ i τ′} (i≤m : toℕ i ℕ.≤ _) →
+  C.wkn₂ Γ,Δ i≤m τ′ ⊢ e ∶ τ →
+  ∀ {e′} → shift Γ,Δ ⊢ e′ ∶ τ′ →
+  rank (e [ e′ / i ]) ≡ rank e
+subst-preserves-rank i≤m Eps Γ,Δ⊢e′∶τ′ = refl
+subst-preserves-rank i≤m (Char c) Γ,Δ⊢e′∶τ′ = refl
+subst-preserves-rank i≤m Bot Γ,Δ⊢e′∶τ′ = refl
+subst-preserves-rank {i = i} i≤m (Var {i = j} j>m) Γ,Δ⊢e′∶τ′ with i F.≟ j
+... | yes refl = ⊥-elim (<⇒≱ j>m i≤m)
+... | no i≢j = refl
+subst-preserves-rank {Γ,Δ = Γ,Δ} {τ = τ} {τ′ = τ′} i≤m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ =
+  cong suc (subst-preserves-rank {Γ,Δ = cons Γ,Δ τ} (s≤s i≤m)
+    (congᶜ (≋ᶜ-sym (wkn₂-comm Γ,Δ z≤n i≤m τ τ′)) Γ,Δ⊢e∶τ)
+    (congᶜ (≋ᶜ-sym (shift≤-wkn₂-comm-≤ Γ,Δ z≤n z≤n τ)) (wkn₁ Γ,Δ⊢e′∶τ′ z≤n τ)))
+subst-preserves-rank i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ =
+  cong suc (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
+subst-preserves-rank i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ =
+  cong₂ (λ x y → suc (x ℕ.+ y))
+        (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
+        (subst-preserves-rank i≤m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′)

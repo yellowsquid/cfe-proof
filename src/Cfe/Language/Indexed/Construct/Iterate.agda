@@ -73,6 +73,9 @@ module _
     where
     module Iter = IndexedLanguage (Iterate f)
 
+  fⁿ≤⋃f : ∀ f n → (f ^ n) (Lift a ∅) ≤ ⋃ f
+  fⁿ≤⋃f f n = record { f = n ,_ }
+
   ⋃-cong : ∀ {f g} → (∀ {x y} → x ≈ y → f x ≈ g y) → ⋃ f ≈ ⋃ g
   ⋃-cong f≈g = record
     { f = λ { (n , l∈fn) → n , _≈_.f (f≈g⇒fn≈gn (L.setoid a) f≈g n (Lift a ∅)) l∈fn}
