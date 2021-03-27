@@ -30,6 +30,49 @@ open import Function
 open import Level
 open import Relation.Binary.PropositionalEquality hiding (subst₂; setoid)
 
+private
+  data Ranked : ℕ → ℕ → Set c where
+    ⊥ : ∀ {n} → Ranked 0 n
+    ε : ∀ {n} → Ranked 0 n
+    Char : ∀ {n} → C → Ranked 0 n
+    _∨_ : ∀ {r s n} → Ranked r n → Ranked s n → Ranked (ℕ.suc (r ℕ.+ s)) n
+    _∙_ : ∀ {r s n} → Ranked r n → Ranked s n → Ranked (ℕ.suc r) n
+    Var : ∀ {n} → Fin n → Ranked 0 n
+    μ : ∀ {r n} → Ranked r (ℕ.suc n) → Ranked (ℕ.suc r) n
+
+  fromRanked : ∀ {r n} → Ranked r n → Expression n
+  fromRanked ⊥ = ⊥
+  fromRanked ε = ε
+  fromRanked (Char x) = Char x
+  fromRanked (r₁ ∨ r₂) = fromRanked r₁ ∨ fromRanked r₂
+  fromRanked (r₁ ∙ r₂) = fromRanked r₁ ∙ fromRanked r₂
+  fromRanked (Var x) = Var x
+  fromRanked (μ r) = μ (fromRanked r)
+
+  toRanked : ∀ {n} → (e : Expression n) → Ranked (rank e) n
+  toRanked ⊥ = ⊥
+  toRanked ε = ε
+  toRanked (Char x) = Char x
+  toRanked (e₁ ∨ e₂) = toRanked e₁ ∨ toRanked e₂
+  toRanked (e₁ ∙ e₂) = toRanked e₁ ∙ toRanked e₂
+  toRanked (Var x) = Var x
+  toRanked (μ e) = μ (toRanked e)
+  
+  l∈⟦e⟧⇒e⤇l′ : ∀ {l r e τ} → ∙,∙ ⊢ fromRanked {r} e ∶ τ → l ∈ ⟦ fromRanked e ⟧ [] → fromRanked e ⤇ l
+  l∈⟦e⟧⇒e⤇l′ {[]} {ℕ.zero} {ε} ∙,∙⊢e∶τ l∈⟦e⟧ = Eps
+  l∈⟦e⟧⇒e⤇l′ {[]} {ℕ.suc _} {e₁ ∨ e₂} (Vee ∙,∙⊢e₁∶τ₁ ∙,∙⊢e₂∶τ₂ τ₁#τ₂) (inj₁ l∈⟦e₁⟧) = Veeˡ (l∈⟦e⟧⇒e⤇l′ ∙,∙⊢e₁∶τ₁ l∈⟦e₁⟧)
+  l∈⟦e⟧⇒e⤇l′ {[]} {ℕ.suc _} {e₁ ∨ e₂} (Vee ∙,∙⊢e₁∶τ₁ ∙,∙⊢e₂∶τ₂ τ₁#τ₂) (inj₂ l∈⟦e₂⟧) = Veeʳ (l∈⟦e⟧⇒e⤇l′ ∙,∙⊢e₂∶τ₂ l∈⟦e₂⟧)
+  l∈⟦e⟧⇒e⤇l′ {[]} {ℕ.suc r} {e₁ ∙ e₂} (Cat ∙,∙⊢e₁∶τ₁ ∙,∙⊢e₂∶τ₂ τ₁⊛τ₂) record { l₁ = [] ; l₁∈A = l∈⟦e₁⟧ } =
+    case ∃[ b ] (T (not b) × (null (⟦ fromRanked e₁ ⟧ []) → T b)) ∋ τ₁⊛τ₂.τ₁.Null , τ₁⊛τ₂.¬n₁ , ⟦e₁⟧⊨τ₁.n⇒n of λ
+      { (false , _ , n⇒n) → ⊥-elim (n⇒n l∈⟦e₁⟧)
+      ; (true , ¬n₁ , _) → ⊥-elim ¬n₁
+      }
+    where
+    module τ₁⊛τ₂ = _⊛_ τ₁⊛τ₂
+    module ⟦e₁⟧⊨τ₁ = _⊨_ (soundness ∙,∙⊢e₁∶τ₁ [] (ext (λ ())))
+  l∈⟦e⟧⇒e⤇l′ {[]} {ℕ.suc r} {μ e} ∙,∙⊢e∶τ l∈⟦e⟧ = Fix {!l∈⟦e⟧⇒e⤇l′!}
+  l∈⟦e⟧⇒e⤇l′ {x ∷ l} {r} {e} ∙,∙⊢e∶τ l∈⟦e⟧ = {!!}
+
 l∈⟦e⟧⇒e⤇l : ∀ {e τ} → ∙,∙ ⊢ e ∶ τ → ∀ {l} → l ∈ ⟦ e ⟧ [] → e ⤇ l
 l∈⟦e⟧⇒e⤇l Eps (lift refl) = Eps
 l∈⟦e⟧⇒e⤇l (Char c) (lift (c∼y ∷ [])) = Char c∼y
