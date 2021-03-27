@@ -19,12 +19,15 @@ open import Data.Bool renaming (_≤_ to _≤ᵇ_; _∨_ to _∨ᵇ_)
 open import Data.Bool.Properties hiding (≤-reflexive; ≤-trans)
 open import Data.Empty
 open import Data.List hiding (null)
+open import Data.List.Properties using (++-identityʳ; ++-assoc)
 open import Data.List.Relation.Binary.Equality.Setoid over
 open import Data.Nat hiding (_≤ᵇ_; _^_) renaming (_≤_ to _≤ⁿ_)
 open import Data.Nat.Properties using (≤-stepsˡ; ≤-stepsʳ) renaming (≤-refl to ≤ⁿ-refl)
 open import Data.Product as Product
 open import Data.Sum as Sum
+import Level as L
 open import Function hiding (_⟶_)
+import Relation.Unary as U
 open import Relation.Unary.Properties
 open import Relation.Binary.PropositionalEquality
 
@@ -118,18 +121,80 @@ L⊨τε⇒L≤｛ε｝{L = L} L⊨τε = record
 ∙-⊨ : ∀ {a b fℓ₁ lℓ₁ fℓ₂ lℓ₂} {A : Language a} {B : Language b} {τ₁ : Type fℓ₁ lℓ₁} {τ₂ : Type fℓ₂ lℓ₂} →
       A ⊨ τ₁ → B ⊨ τ₂ → τ₁ ⊛ τ₂ → A ∙ˡ B ⊨ τ₁ ∙ τ₂
 ∙-⊨ {A = A} {B} {τ₁} {τ₂} A⊨τ₁ B⊨τ₂ τ₁⊛τ₂ = record
-  { n⇒n = λ { ([] , l∈A , _) → ⊥-elim (L⊨τ+¬N⇒ε∉L A⊨τ₁ τ₁⊛τ₂.¬n₁ l∈A) }
+  { n⇒n = λ { record { l₁ = [] ; l₁∈A = ε∈A } → ⊥-elim (L⊨τ+¬N⇒ε∉L A⊨τ₁ τ₁⊛τ₂.¬n₁ ε∈A) }
   ; f⇒f = λ
-    { (_ , [] , l∈A , l′ , l′∈B , _) → ⊥-elim (L⊨τ+¬N⇒ε∉L A⊨τ₁ τ₁⊛τ₂.¬n₁ l∈A)
-    ; (_ , x ∷ l , l∈A , l′ , l′∈B , x≈x ∷ _) → inj₁ (A⊨τ₁.f⇒f (l , A.∈-resp-≋ (x≈x ∷ ≋-refl) l∈A))
+    { (_ , record { l₁ = [] ; l₁∈A = ε∈A }) → ⊥-elim (L⊨τ+¬N⇒ε∉L A⊨τ₁ τ₁⊛τ₂.¬n₁ ε∈A)
+    ; (_ , record { l₁ = x ∷ l ; l₁∈A = xl∈A ; eq = x∼x ∷ _ }) → inj₁ (A⊨τ₁.f⇒f (l , A.∈-resp-≋ (x∼x ∷ ≋-refl) xl∈A))
     }
-  ; l⇒l = {!!}
+  ; l⇒l = l⇒l
   }
   where
   module A = Language A
+  module B = Language B
   module A⊨τ₁ = _⊨_ A⊨τ₁
   module B⊨τ₂ = _⊨_ B⊨τ₂
   module τ₁⊛τ₂ = _⊛_ τ₁⊛τ₂
+
+  null-case : ∀ {c} → null B → Flast τ₂ c ⊎ First τ₂ c ⊎ Flast τ₁ c → Flast (τ₁ ∙ τ₂) c
+  null-case {c} ε∈B proof = case ∃[ b ] (null B → T b) ∋ Null τ₂ , B⊨τ₂.n⇒n return (λ (b , _) → (Flast τ₂ U.∪ (if b then _ else _)) c) of λ
+    { (false , n⇒n) → ⊥-elim (n⇒n ε∈B)
+    ; (true , _) → proof
+    }
+
+  l⇒l : flast (A ∙ˡ B) U.⊆ Flast (τ₁ ∙ τ₂)
+  l⇒l {c} (l , l≢ε , l∈A∙B @ record {l₂ = l₂} , l′ , lcl′∈A∙B) with Compare.compare
+    (Concat.l₁ l∈A∙B)
+    (Concat.l₂ l∈A∙B ++ c ∷ l′)
+    (Concat.l₁ lcl′∈A∙B)
+    (Concat.l₂ lcl′∈A∙B)
+    (begin
+      Concat.l₁ l∈A∙B ++ Concat.l₂ l∈A∙B ++ c ∷ l′   ≡˘⟨ ++-assoc (Concat.l₁ l∈A∙B) (Concat.l₂ l∈A∙B) (c ∷ l′) ⟩
+      (Concat.l₁ l∈A∙B ++ Concat.l₂ l∈A∙B) ++ c ∷ l′ ≈⟨ ++⁺ (Concat.eq l∈A∙B) ≋-refl ⟩
+      l ++ c ∷ l′                                    ≈˘⟨ Concat.eq lcl′∈A∙B ⟩
+      Concat.l₁ lcl′∈A∙B ++ Concat.l₂ lcl′∈A∙B        ∎)
+    where
+    open import Relation.Binary.Reasoning.Setoid ≋-setoid
+  ... | cmp with Compare.<?> cmp
+  ... | tri< x _ _ = ⊥-elim (τ₁⊛τ₂.∄[l₁∩f₂] y (A⊨τ₁.l⇒l (-, l₁′≢ε , Concat.l₁∈A lcl′∈A∙B , -, l₁′yw∈A) , B⊨τ₂.f⇒f (-, yw′∈B)))
+    where
+    lsplit = Compare.left-split cmp x
+    y = proj₁ lsplit
+    l₁′≢ε = λ { refl → case ∃[ b ] T (not b) × (null A → T b) ∋ Null τ₁ , τ₁⊛τ₂.¬n₁ , A⊨τ₁.n⇒n of λ
+      { (false , _ , n⇒n) → n⇒n (Concat.l₁∈A lcl′∈A∙B)
+      ; (true , ¬n₁ , _) → ¬n₁
+      } }
+    l₁′yw∈A = A.∈-resp-≋ (proj₁ (proj₂ (proj₂ lsplit))) (Concat.l₁∈A l∈A∙B)
+    yw′∈B = B.∈-resp-≋ (≋-sym (proj₂ (proj₂ (proj₂ lsplit)))) (Concat.l₂∈B lcl′∈A∙B)
+  l⇒l {c} (l , l≢ε , l∈A∙B @ record { l₂ = [] } , l′ , lcl′∈A∙B) | cmp | tri≈ _ x _ =
+    null-case (Concat.l₂∈B l∈A∙B) (inj₂ (inj₁ (B⊨τ₂.f⇒f (-, cl′∈B))))
+    where
+    esplit = Compare.eq-split cmp x
+    cl′∈B = B.∈-resp-≋ (≋-sym (proj₂ esplit)) (Concat.l₂∈B lcl′∈A∙B)
+  l⇒l {c} (l , l≢ε , l∈A∙B @ record { l₂ = _ ∷ _ } , l′ , lcl′∈A∙B) | cmp | tri≈ _ x _ =
+    inj₁ (B⊨τ₂.l⇒l (-, (λ ()) , Concat.l₂∈B l∈A∙B , -, l₂cl′∈A∙B))
+    where
+    esplit = Compare.eq-split cmp x
+    l₂cl′∈A∙B = B.∈-resp-≋ (≋-sym (proj₂ esplit)) (Concat.l₂∈B lcl′∈A∙B)
+  l⇒l {c} (l , l≢ε , l∈A∙B @ record { l₂ = [] } , l′ , lcl′∈A∙B) | cmp | tri> _ _ x =
+    null-case (Concat.l₂∈B l∈A∙B) (inj₂ (inj₂ (A⊨τ₁.l⇒l (-, l≢ε , l∈A , -, lcw∈A))))
+    where
+    rsplit = Compare.right-split cmp x
+    c∼y = case proj₂ (proj₂ (proj₂ rsplit)) of λ { (c∼y ∷ _) → c∼y }
+    l₁≋l = ≋-trans (≋-sym (≋-reflexive (++-identityʳ (Concat.l₁ l∈A∙B)))) (Concat.eq l∈A∙B)
+    lcw≋l₁yw = ≋-sym (≋-trans (++⁺ (≋-sym l₁≋l) (c∼y ∷ ≋-refl)) (proj₁ (proj₂ (proj₂ rsplit))))
+    l∈A = A.∈-resp-≋ l₁≋l (Concat.l₁∈A l∈A∙B)
+    lcw∈A = A.∈-resp-≋ lcw≋l₁yw (Concat.l₁∈A lcl′∈A∙B)
+  l⇒l {c} (l , l≢ε , l∈A∙B @ record { l₂ = y ∷ _ } , l′ , lcl′∈A∙B) | cmp | tri> _ _ x =
+    ⊥-elim (τ₁⊛τ₂.∄[l₁∩f₂] y (A⊨τ₁.l⇒l (-, l₁≢ε , Concat.l₁∈A l∈A∙B , -, l₁yw∈A) , B⊨τ₂.f⇒f (-, Concat.l₂∈B l∈A∙B)))
+    where
+    rsplit = Compare.right-split cmp x
+    l₁≢ε = λ { refl → case ∃[ b ] T (not b) × (null A → T b) ∋ Null τ₁ , τ₁⊛τ₂.¬n₁ , A⊨τ₁.n⇒n of λ
+      { (false , _ , n⇒n) → n⇒n (Concat.l₁∈A l∈A∙B)
+      ; (true , ¬n₁ , _) → ¬n₁
+      } }
+    y∼z = case proj₂ (proj₂ (proj₂ rsplit)) of λ { (y∼z ∷ _) → y∼z }
+    l₁′≋l₁yw = ≋-sym (≋-trans (++⁺ ≋-refl (y∼z ∷ ≋-refl)) (proj₁ (proj₂ (proj₂ rsplit))))
+    l₁yw∈A = A.∈-resp-≋ l₁′≋l₁yw (Concat.l₁∈A lcl′∈A∙B)
 
 ∪-⊨ : ∀ {a b fℓ₁ lℓ₁ fℓ₂ lℓ₂} {A : Language a} {B : Language b} {τ₁ : Type fℓ₁ lℓ₁} {τ₂ : Type fℓ₂ lℓ₂} →
       A ⊨ τ₁ → B ⊨ τ₂ → τ₁ # τ₂ → A ∪ B ⊨ τ₁ ∨ τ₂

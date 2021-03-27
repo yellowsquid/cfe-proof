@@ -20,6 +20,8 @@ open import Relation.Binary.PropositionalEquality
 
 infix 4 _∈_
 infix 4 _∉_
+infix 4 _≈_
+infix 4 _≤_
 
 record Language a : Set (c ⊔ ℓ ⊔ suc a) where
   field

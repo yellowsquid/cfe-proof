@@ -10,6 +10,7 @@ open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 
 open import Cfe.Language over hiding (_≤_; _≈_)
 open import Data.Bool as 𝔹 hiding (_∨_) renaming (_≤_ to _≤ᵇ_)
+open import Data.Empty.Polymorphic
 open import Level as L renaming (suc to lsuc)
 open import Relation.Unary as U
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -45,8 +46,8 @@ _∨_ : ∀ {fℓ₁ lℓ₁ fℓ₂ lℓ₂} → Type fℓ₁ lℓ₁ → Type 
 _∙_ : ∀ {fℓ₁ lℓ₁ fℓ₂ lℓ₂} → Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ₂) (lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂)
 _∙_ {lℓ₁ = lℓ₁} {fℓ₂} {lℓ₂} τ₁ τ₂ = record
   { Null = Null τ₁ ∧ Null τ₂
-  ; First = First τ₁ ∪ (if Null τ₁ then First τ₂ else λ x → L.Lift fℓ₂ (x U.∈ U.∅))
-  ; Flast = Flast τ₂ ∪ (if Null τ₂ then First τ₂ ∪ Flast τ₁ else λ x → L.Lift (lℓ₁ ⊔ fℓ₂) (x U.∈ U.∅))
+  ; First = First τ₁ ∪ (if Null τ₁ then First τ₂ else λ x → ⊥)
+  ; Flast = Flast τ₂ ∪ (if Null τ₂ then First τ₂ ∪ Flast τ₁ else λ x → ⊥)
   }
 
 record _⊨_ {a} {fℓ} {lℓ} (A : Language a) (τ : Type fℓ lℓ) : Set (c ⊔ a ⊔ fℓ ⊔ lℓ) where
