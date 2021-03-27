@@ -12,13 +12,14 @@ open import Cfe.Context over as C
   renaming (_≋_ to _≋ᶜ_; ≋-sym to ≋ᶜ-sym; ≋-trans to ≋ᶜ-trans )
 open import Cfe.Expression over as E
 open import Cfe.Judgement.Base over
+open import Cfe.Language over
 open import Cfe.Type over
 open import Cfe.Type.Construct.Lift over
 open import Data.Empty
 open import Data.Fin as F hiding (splitAt)
 open import Data.Fin.Properties hiding (≤-refl; ≤-trans; ≤-irrelevant)
 open import Data.Nat as ℕ hiding (_⊔_)
-open import Data.Nat.Properties
+open import Data.Nat.Properties renaming (≤-refl to ≤ⁿ-refl; ≤-trans to ≤ⁿ-trans; ≤-irrelevant to ≤ⁿ-irrelevant)
 open import Data.Product
 open import Data.Vec
 open import Data.Vec.Properties
@@ -31,7 +32,7 @@ open import Relation.Nullary
 private
   toℕ-punchIn : ∀ {n} i j → toℕ j ℕ.≤ toℕ (punchIn {n} i j)
   toℕ-punchIn zero j = n≤1+n (toℕ j)
-  toℕ-punchIn (suc i) zero = ≤-refl
+  toℕ-punchIn (suc i) zero = ≤ⁿ-refl
   toℕ-punchIn (suc i) (suc j) = s≤s (toℕ-punchIn i j)
 
   punchIn[i,j]≥m : ∀ {n m i j} → toℕ i ℕ.≤ m → toℕ j ≥ m → toℕ (punchIn {n} i j) ≥ suc m
@@ -39,7 +40,7 @@ private
   punchIn[i,j]≥m {i = suc i} {suc j} (s≤s i≤m) (s≤s j≥m) = s≤s (punchIn[i,j]≥m i≤m j≥m)
 
 congᶜ : ∀ {n} {Γ,Δ Γ,Δ′ : Context n} {e τ} → Γ,Δ ≋ᶜ Γ,Δ′ → Γ,Δ ⊢ e ∶ τ → Γ,Δ′ ⊢ e ∶ τ
-congᶜ {Γ,Δ = Γ,Δ} {Γ,Δ′} (refl , refl , refl) Γ,Δ⊢e∶τ with ≤-irrelevant (Context.m≤n Γ,Δ) (Context.m≤n Γ,Δ′)
+congᶜ {Γ,Δ = Γ,Δ} {Γ,Δ′} (refl , refl , refl) Γ,Δ⊢e∶τ with ≤ⁿ-irrelevant (Context.m≤n Γ,Δ) (Context.m≤n Γ,Δ′)
 ... | refl = Γ,Δ⊢e∶τ
 
 congᵗ : ∀ {n} {Γ,Δ : Context n} {e τ τ′} → τ ≡ τ′ → Γ,Δ ⊢ e ∶ τ → Γ,Δ ⊢ e ∶ τ′
@@ -50,12 +51,12 @@ wkn₁ Eps i≥m τ′ = Eps
 wkn₁ (Char c) i≥m τ′ = Char c
 wkn₁ Bot i≥m τ′ = Bot
 wkn₁ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} (Var {i = j} j≥m) {i = i} i≥m τ′ =
-  congᵗ (τ≡τ′ Γ m≤n i≥m j≥m τ′) (Var (≤-trans j≥m (toℕ-punchIn i j)))
+  congᵗ (τ≡τ′ Γ m≤n i≥m j≥m τ′) (Var (≤ⁿ-trans j≥m (toℕ-punchIn i j)))
   where
   τ≡τ′ : ∀ {a A n m i j} xs (m≤n : m ℕ.≤ n) (i≥m : toℕ i ≥ _) j≥m x →
     lookup {a} {A}
       (insert′ xs (s≤s m≤n) (reduce≥′ (≤-step m≤n) i≥m) x)
-      (reduce≥′ (≤-step m≤n) (≤-trans j≥m (toℕ-punchIn i j))) ≡
+      (reduce≥′ (≤-step m≤n) (≤ⁿ-trans j≥m (toℕ-punchIn i j))) ≡
     lookup xs (reduce≥′ m≤n j≥m)
   τ≡τ′ {i = zero} {j} (y ∷ xs) z≤n z≤n z≤n x = refl
   τ≡τ′ {i = suc i} {zero} (y ∷ xs) z≤n z≤n z≤n x = refl
@@ -86,10 +87,10 @@ shift≤ Eps i≤m = Eps
 shift≤ (Char c) i≤m = Char c
 shift≤ Bot i≤m = Bot
 shift≤ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} (Var {i = j} j≥m) i≤m =
-  congᵗ (τ≡τ′ Γ Δ m≤n i≤m j≥m) (Var (≤-trans i≤m j≥m))
+  congᵗ (τ≡τ′ Γ Δ m≤n i≤m j≥m) (Var (≤ⁿ-trans i≤m j≥m))
   where
   τ≡τ′ : ∀ {a A n m i j} xs ys (m≤n : m ℕ.≤ n) (i≤m : i ℕ.≤ m) (j≥m : toℕ j ≥ m) →
-         lookup {a} {A} (drop′ m≤n i≤m (ys ++ xs)) (reduce≥′ (≤-trans i≤m m≤n) (≤-trans i≤m j≥m)) ≡
+         lookup {a} {A} (drop′ m≤n i≤m (ys ++ xs)) (reduce≥′ (≤ⁿ-trans i≤m m≤n) (≤ⁿ-trans i≤m j≥m)) ≡
          lookup xs (reduce≥′ m≤n j≥m)
   τ≡τ′ xs [] z≤n z≤n z≤n = refl
   τ≡τ′ {j = suc j} xs (x ∷ ys) (s≤s m≤n) z≤n (s≤s j≥m) = τ≡τ′ xs ys m≤n z≤n j≥m
@@ -123,7 +124,7 @@ subst₁ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} {i = i} 
   τ≡τ′ {n = suc n} {i = suc i} {zero} (y ∷ xs) z≤n i≢j z≤n z≤n x = refl
   τ≡τ′ {n = suc n} {i = suc i} {suc j} (y ∷ xs) z≤n i≢j z≤n z≤n x = τ≡τ′ xs z≤n (i≢j ∘ cong suc) z≤n z≤n x
   τ≡τ′ {n = suc n} {i = suc i} {suc j} xs (s≤s m≤n) i≢j (s≤s i≥m) (s≤s j≥m) x = τ≡τ′ xs m≤n (i≢j ∘ cong suc) i≥m j≥m x
-... | yes refl with ≤-irrelevant i≥m j≥m
+... | yes refl with ≤ⁿ-irrelevant i≥m j≥m
 ... | refl = congᵗ (sym (τ≡τ′ Γ m≤n i≥m τ′)) Γ,Δ⊢e′∶τ′
   where
   τ≡τ′ : ∀ {a A n m i} xs (m≤n : m ℕ.≤ n) (i≥m : toℕ i ≥ m) x →
@@ -175,8 +176,16 @@ soundness {Γ,Δ = Γ,Δ} (Var {i = i} i≥m) γ γ⊨Γ,Δ = subst (⟦ Var i �
   where
   τ≡τ′ : ∀ {n i} (Γ,Δ : Context n) i≥m → lookup (Context.Γ Γ,Δ) (reduce≥′ {i = i} (Context.m≤n Γ,Δ) i≥m) ≡ lookup (toVec Γ,Δ) i
   τ≡τ′ {.(suc _)} record { m = .0 ; m≤n = z≤n ; Γ = (x ∷ Γ) ; Δ = [] } i≥m = refl
-  τ≡τ′ {.(suc _)} {suc i} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } (s≤s i≥m) = τ≡τ′ (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ}) i≥m
--- ⋃ (λ X → ⟦ e ⟧ (X ∷ y)) ⊨ τ
-soundness (Fix Γ,Δ⊢e∶τ) γ γ⊨Γ,Δ = {!!}
-soundness (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) γ γ⊨Γ,Δ = {!!}
-soundness (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ,Δ = {!!}
+  τ≡τ′ {.(suc _)} {suc i} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } (s≤s i≥m) =
+    τ≡τ′ (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ}) i≥m
+soundness (Fix {e = e} Γ,Δ⊢e∶τ) γ γ⊨Γ,Δ =
+  ⋃-⊨ (λ L≤L′ → mono e (PW.extensional⇒inductive (PW.ext (λ { F.zero → L≤L′ ; (suc _) → ≤-refl }))))
+      (λ {L} L⊨τ → soundness Γ,Δ⊢e∶τ (L ∷ γ) (PW.ext (λ { zero → L⊨τ ; (suc i) → PW.Pointwise.app γ⊨Γ,Δ i })))
+soundness {Γ,Δ = Γ,Δ} (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) γ γ⊨Γ,Δ =
+  ∙-⊨ (soundness Γ,Δ⊢e₁∶τ₁ γ γ⊨Γ,Δ)
+      (soundness Δ++Γ,∙⊢e₂∶τ₂ γ (subst (PW.Pointwise _⊨_ γ) (sym (shift≤-toVec Γ,Δ z≤n)) γ⊨Γ,Δ))
+      τ₁⊛τ₂
+soundness (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ,Δ =
+  ∪-⊨ (soundness Γ,Δ⊢e₁∶τ₁ γ γ⊨Γ,Δ)
+      (soundness Γ,Δ⊢e₂∶τ₂ γ γ⊨Γ,Δ)
+      τ₁#τ₂

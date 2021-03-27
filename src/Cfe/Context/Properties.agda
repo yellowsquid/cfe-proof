@@ -115,3 +115,8 @@ shift≤-wkn₂-comm-> record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } i≤
         insert (take′ j≤m ys) (fromℕ< (s≤s i≤j)) y
   eq₂ {i = zero} _ _ _ _ _ = refl
   eq₂ {i = suc _} (x ∷ ys) (s≤s m≤n) (s≤s i≤j) (s≤s j≤m) y = cong (x ∷_) (eq₂ ys m≤n i≤j j≤m y)
+
+shift≤-toVec : ∀ {n i} (Γ,Δ : Context n) (i≤m : i ℕ.≤ _) → toVec (shift≤ Γ,Δ i≤m) ≡ toVec Γ,Δ
+shift≤-toVec record { m = .0 ; m≤n = z≤n ; Γ = Γ ; Δ = [] } z≤n = refl
+shift≤-toVec {suc n} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } z≤n = cong (x ∷_) (shift≤-toVec (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ }) z≤n)
+shift≤-toVec {suc n} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } (s≤s i≤m) = cong (x ∷_) (shift≤-toVec (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ }) i≤m)
