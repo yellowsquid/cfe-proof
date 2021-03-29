@@ -2,7 +2,7 @@
 
 open import Relation.Binary using (Setoid)
 
-module Cfe.Parse.Properties
+module Cfe.Derivation.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
@@ -14,7 +14,7 @@ open import Cfe.Language over hiding (≤-refl)
 open import Cfe.Language.Construct.Concatenate over using (Concat)
 open import Cfe.Language.Indexed.Construct.Iterate over
 open import Cfe.Judgement over
-open import Cfe.Parse.Base over
+open import Cfe.Derivation.Base over
 open import Cfe.Type over using (_⊛_; _⊨_)
 open import Data.Bool using (T; not; true; false)
 open import Data.Empty using (⊥-elim)
