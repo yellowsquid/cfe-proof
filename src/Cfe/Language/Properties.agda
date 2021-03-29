@@ -8,8 +8,6 @@ module Cfe.Language.Properties
 
 open Setoid over using () renaming (Carrier to C)
 open import Cfe.Language.Base over
--- open Language
-
 open import Data.List
 open import Data.List.Relation.Binary.Equality.Setoid over
 open import Function
@@ -94,6 +92,29 @@ setoid a = record { isEquivalence = ≈-isEquivalence {a} }
 
 poset : ∀ a → Poset (c ⊔ ℓ ⊔ suc a) (c ⊔ ℓ ⊔ a) (c ⊔ a)
 poset a = record { isPartialOrder = ≤-isPartialOrder a }
+
+<-trans : ∀ {a b c} → Trans (_<_ {a}) (_<_ {b} {c}) _<_
+<-trans A<B B<C = record
+  { f = B<C.f ∘ A<B.f
+  ; l = A<B.l
+  ; l∉A = A<B.l∉A
+  ; l∈B = B<C.f A<B.l∈B
+  }
+  where
+  module A<B = _<_ A<B
+  module B<C = _<_ B<C
+
+<-irrefl : ∀ {a b} → Irreflexive (_≈_ {a} {b}) _<_
+<-irrefl A≈B A<B = A<B.l∉A (A≈B.f⁻¹ A<B.l∈B)
+  where
+  module A≈B = _≈_ A≈B
+  module A<B = _<_ A<B
+
+<-asym : ∀ {a} → Asymmetric (_<_ {a})
+<-asym A<B B<A = A<B.l∉A (B<A.f A<B.l∈B)
+  where
+  module A<B = _<_ A<B
+  module B<A = _<_ B<A
 
 lift-cong : ∀ {a} b (L : Language a) → Lift b L ≈ L
 lift-cong b L = record

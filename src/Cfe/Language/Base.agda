@@ -63,6 +63,13 @@ record _≈_ {a b} (A : Language a) (B : Language b) : Set (c ⊔ ℓ ⊔ a ⊔ 
     f : ∀ {l} → l ∈ A → l ∈ B
     f⁻¹ : ∀ {l} → l ∈ B → l ∈ A
 
+record _<_ {a b} (A : Language a) (B : Language b) : Set (c ⊔ ℓ ⊔ a ⊔ b) where
+  field
+    f : ∀ {l} → l ∈ A → l ∈ B
+    l : List C
+    l∉A : l ∉ A
+    l∈B : l ∈ B
+
 null : ∀ {a} → Language a → Set a
 null A = [] ∈ A
 

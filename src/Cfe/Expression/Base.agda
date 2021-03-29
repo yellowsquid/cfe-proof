@@ -97,3 +97,8 @@ rank (e₁ ∨ e₂) = suc (rank e₁ ℕ.+ rank e₂)
 rank (e₁ ∙ _) = suc (rank e₁)
 rank (Var _) = 0
 rank (μ e) = suc (rank e)
+
+infix 4 _<ᵣₐₙₖ_
+
+_<ᵣₐₙₖ_ : ∀ {n} → Rel (Expression n) _
+_<ᵣₐₙₖ_ = ℕ._<_ on rank

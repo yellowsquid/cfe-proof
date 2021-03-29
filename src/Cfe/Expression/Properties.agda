@@ -17,6 +17,8 @@ import Cfe.Language.Indexed.Construct.Iterate over as ⋃
 open import Data.Fin as F
 open import Data.Fin.Properties
 open import Data.Nat as ℕ hiding (_⊔_)
+open import Data.Nat.Induction
+open import Data.Nat.Properties using (m≤m+n; m≤n+m; n<1+n; module ≤-Reasoning)
 open import Data.Product
 open import Data.Sum
 open import Data.Unit
@@ -24,8 +26,10 @@ open import Data.Vec
 open import Data.Vec.Properties
 import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
 open import Function
+open import Induction.WellFounded
 open import Level renaming (suc to lsuc)
 open import Relation.Binary.PropositionalEquality as ≡ using (_≡_)
+import Relation.Binary.Construct.On as On
 open import Relation.Nullary
 
 isEquivalence : ∀ n → IsEquivalence (_≋_ {n})
@@ -206,3 +210,24 @@ cast-involutive (Var x) k≡m m≡n k≡n = ≡.cong Var (toℕ-injective (begin
   where
   open ≡.≡-Reasoning
 cast-involutive (μ e) k≡m m≡n k≡n = ≡.cong μ (cast-involutive e (≡.cong suc k≡m) (≡.cong suc m≡n) (≡.cong suc k≡n))
+
+<ᵣₐₙₖ-wellFounded : ∀ {n} → WellFounded (_<ᵣₐₙₖ_ {n})
+<ᵣₐₙₖ-wellFounded = On.wellFounded rank <-wellFounded
+
+e₁<ᵣₐₙₖe₁∨e₂ : ∀ {n} → (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∨ e₂
+e₁<ᵣₐₙₖe₁∨e₂ e₁ e₂ = begin-strict
+  rank e₁                   ≤⟨ m≤m+n (rank e₁) (rank e₂) ⟩
+  rank e₁ ℕ.+ rank e₂       <⟨ n<1+n (rank e₁ ℕ.+ rank e₂) ⟩
+  suc (rank e₁ ℕ.+ rank e₂) ≡⟨⟩
+  rank (e₁ ∨ e₂)            ∎
+  where
+  open ≤-Reasoning
+
+e₂<ᵣₐₙₖe₁∨e₂ : ∀ {n} → (e₁ e₂ : Expression n) → e₂ <ᵣₐₙₖ e₁ ∨ e₂
+e₂<ᵣₐₙₖe₁∨e₂ e₁ e₂ = begin-strict
+  rank e₂                   ≤⟨ m≤n+m (rank e₂) (rank e₁) ⟩
+  rank e₁ ℕ.+ rank e₂       <⟨ n<1+n (rank e₁ ℕ.+ rank e₂) ⟩
+  suc (rank e₁ ℕ.+ rank e₂) ≡⟨⟩
+  rank (e₁ ∨ e₂)            ∎
+  where
+  open ≤-Reasoning

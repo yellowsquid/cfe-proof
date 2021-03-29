@@ -6,11 +6,11 @@ module Cfe.Derivation.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open Setoid over renaming (Carrier to C)
+open Setoid over renaming (Carrier to C; _≈_ to _∼_)
 
 open import Cfe.Context over hiding (_≋_)
 open import Cfe.Expression over hiding (_≋_)
-open import Cfe.Language over hiding (≤-refl)
+open import Cfe.Language over hiding (≤-refl; _≈_; _<_)
 open import Cfe.Language.Construct.Concatenate over using (Concat)
 open import Cfe.Language.Indexed.Construct.Iterate over
 open import Cfe.Judgement over
@@ -40,10 +40,10 @@ open import Relation.Binary.PropositionalEquality as ≡ hiding (subst₂; setoi
 private
   infix 4 _<_
   _<_ : Rel (List C × Expression 0) _
-  _<_ = ×-Lex _≡_ ℕ._<_ ℕ._<_ on (Product.map length rank)
+  _<_ = ×-Lex _≡_ ℕ._<_ _<ᵣₐₙₖ_ on (Product.map₁ length)
 
   <-wellFounded : WellFounded _<_
-  <-wellFounded = On.wellFounded (Product.map length rank) (×-wellFounded <ⁿ-wellFounded <ⁿ-wellFounded)
+  <-wellFounded = On.wellFounded (Product.map₁ length) (×-wellFounded <ⁿ-wellFounded <ᵣₐₙₖ-wellFounded)
 
 l∈⟦e⟧⇒e⤇l : ∀ {e τ} → ∙,∙ ⊢ e ∶ τ → ∀ {l} → l ∈ ⟦ e ⟧ [] → e ⤇ l
 l∈⟦e⟧⇒e⤇l {e} {τ} ∙,∙⊢e∶τ {l} l∈⟦e⟧ = All.wfRec <-wellFounded _ Pred go (l , e) ∙,∙⊢e∶τ l∈⟦e⟧
@@ -82,24 +82,6 @@ l∈⟦e⟧⇒e⤇l {e} {τ} ∙,∙⊢e∶τ {l} l∈⟦e⟧ = All.wfRec <-well
   ... | inj₂ ∣l₁∣≡0 with Concat.l₁ l∈⟦e₁∙e₂⟧ | Concat.l₁∈A l∈⟦e₁∙e₂⟧ | (_⊛_.τ₁.Null τ₁⊛τ₂) | _⊛_.¬n₁ τ₁⊛τ₂ | _⊨_.n⇒n (soundness ∙,∙⊢e₁∶τ₁ [] (ext (λ ()))) | ∣l₁∣≡0
   ... | [] | ε∈A | false | _ | n⇒n | refl = ⊥-elim (n⇒n ε∈A)
 
-  e₁<e₁∨e₂ : ∀ l e₁ e₂ → (l , e₁) < (l , e₁ ∨ e₂)
-  e₁<e₁∨e₂ _ e₁ e₂ = inj₂ (≡.refl , (begin-strict
-    rank e₁                     ≤⟨ m≤m+n (rank e₁) (rank e₂) ⟩
-    rank e₁ ℕ.+ rank e₂         <⟨ n<1+n (rank e₁ ℕ.+ rank e₂ ) ⟩
-    ℕ.suc (rank e₁ ℕ.+ rank e₂) ≡⟨⟩
-    rank (e₁ ∨ e₂)              ∎))
-    where
-    open ≤-Reasoning
-
-  e₂<e₁∨e₂ : ∀ l e₁ e₂ → (l , e₂) < (l , e₁ ∨ e₂)
-  e₂<e₁∨e₂ _ e₁ e₂ = inj₂ (≡.refl , (begin-strict
-    rank e₂                     ≤⟨ m≤n+m (rank e₂) (rank e₁) ⟩
-    rank e₁ ℕ.+ rank e₂         <⟨ n<1+n (rank e₁ ℕ.+ rank e₂ ) ⟩
-    ℕ.suc (rank e₁ ℕ.+ rank e₂) ≡⟨⟩
-    rank (e₁ ∨ e₂)              ∎))
-    where
-    open ≤-Reasoning
-
   l∈⟦e⟧ⁿ⇒l∈⟦e[μe/0]⟧ : ∀ {l} e n → l ∈ ((λ X → ⟦ e ⟧ (X ∷ [])) ^ n) (⟦ ⊥ ⟧ []) → l ∈ ⟦ e [ μ e / F.zero ] ⟧ []
   l∈⟦e⟧ⁿ⇒l∈⟦e[μe/0]⟧ e (suc n) l∈⟦e⟧ⁿ = _≤_.f
     (begin
@@ -128,5 +110,7 @@ l∈⟦e⟧⇒e⤇l {e} {τ} ∙,∙⊢e∶τ {l} l∈⟦e⟧ = All.wfRec <-well
       l∈⟦e⟧.eq
     where
     module l∈⟦e⟧ = Concat l∈⟦e⟧
-  go (l , e₁ ∨ e₂) rec (Vee ∙,∙⊢e₁∶τ₁ _ _) (inj₁ l∈⟦e₁⟧) = Veeˡ (rec (l , e₁) (e₁<e₁∨e₂ l e₁ e₂) ∙,∙⊢e₁∶τ₁ l∈⟦e₁⟧)
-  go (l , e₁ ∨ e₂) rec (Vee _ ∙,∙⊢e₂∶τ₂ _) (inj₂ l∈⟦e₂⟧) = Veeʳ (rec (l , e₂) (e₂<e₁∨e₂ l e₁ e₂) ∙,∙⊢e₂∶τ₂ l∈⟦e₂⟧)
+  go (l , e₁ ∨ e₂) rec (Vee ∙,∙⊢e₁∶τ₁ _ _) (inj₁ l∈⟦e₁⟧) =
+    Veeˡ (rec (l , e₁) (inj₂ (≡.refl , e₁<ᵣₐₙₖe₁∨e₂ e₁ e₂)) ∙,∙⊢e₁∶τ₁ l∈⟦e₁⟧)
+  go (l , e₁ ∨ e₂) rec (Vee _ ∙,∙⊢e₂∶τ₂ _) (inj₂ l∈⟦e₂⟧) =
+    Veeʳ (rec (l , e₂) (inj₂ (≡.refl , e₂<ᵣₐₙₖe₁∨e₂ e₁ e₂)) ∙,∙⊢e₂∶τ₂ l∈⟦e₂⟧)
