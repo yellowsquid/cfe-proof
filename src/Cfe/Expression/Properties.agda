@@ -231,3 +231,16 @@ e₂<ᵣₐₙₖe₁∨e₂ e₁ e₂ = begin-strict
   rank (e₁ ∨ e₂)            ∎
   where
   open ≤-Reasoning
+
+-- ⟦ e ⟧ (⟦ μ e ⟧ [] ∷ []) ≤ ⟦ μ e ⟧ []
+-- l ∈ ⟦ e ⟧ (⟦ μ e ⟧ [] ∷ []) → l ∈ ⟦ μ e ⟧ []
+-- l ∈ ⟦ e ⟧ (⟦ μ e ⟧ [] ∷ []) → l ∈ ⋃ (λ x → ⟦ e ⟧ (x ∷ []))
+-- l ∈ ⟦ e′ ⟧ (⟦ μ e ⟧ [] ∷ []) → ∃[ n ] l ∈ ⟦ e′ ⟧ ((λ X → ⟦ e ⟧ (X ∷ [])) ^ n ∷ [])
+-- e-unroll : ∀ {n} (e : Expression (suc n)) e′ i γ → ⟦ e [ e′ / i ] ⟧ γ L.≤ ∃[ n ] (⟦ e ⟧ )
+-- e-unroll ⊥ = ?
+-- e-unroll ε = ?
+-- e-unroll (Char x) = ?
+-- e-unroll (e ∨ e₁) = {!!}
+-- e-unroll (e ∙ e₁) = {!!}
+-- e-unroll (Var x) = {!!}
+-- e-unroll (μ e) = {!!}

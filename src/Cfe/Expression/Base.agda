@@ -100,5 +100,5 @@ rank (μ e) = suc (rank e)
 
 infix 4 _<ᵣₐₙₖ_
 
-_<ᵣₐₙₖ_ : ∀ {n} → Rel (Expression n) _
-_<ᵣₐₙₖ_ = ℕ._<_ on rank
+_<ᵣₐₙₖ_ : ∀ {m n} → REL (Expression m) (Expression n) _
+e <ᵣₐₙₖ e′ = rank e ℕ.< rank e′
