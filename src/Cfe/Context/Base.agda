@@ -6,7 +6,7 @@ module Cfe.Context.Base
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open import Cfe.Type over
+open import Cfe.Type over renaming (_≤_ to _≤ᵗ_)
 open import Data.Empty
 open import Data.Fin as F hiding (cast)
 open import Data.Fin.Properties hiding (≤-trans)
@@ -14,6 +14,7 @@ open import Data.Nat as ℕ hiding (_⊔_)
 open import Data.Nat.Properties as NP
 open import Data.Product
 open import Data.Vec
+open import Data.Vec.Relation.Binary.Pointwise.Inductive
 open import Level renaming (suc to lsuc)
 open import Relation.Binary.PropositionalEquality
 open import Relation.Nullary
@@ -93,4 +94,15 @@ shift : ∀ {n} → Context n → Context n
 shift Γ,Δ = shift≤ Γ,Δ z≤n
 
 _≋_ : ∀ {n} → Rel (Context n) (c ⊔ lsuc ℓ)
-Γ,Δ ≋ Γ,Δ′ = Σ (Context.m Γ,Δ ≡ Context.m Γ,Δ′) λ {refl → Context.Γ Γ,Δ ≡ Context.Γ Γ,Δ′ × Context.Δ Γ,Δ ≡ Context.Δ Γ,Δ′}
+Γ,Δ ≋ Γ,Δ′ = Σ (Γ,Δ.m ≡ Γ,Δ′.m) λ { refl → Γ,Δ.Γ ≋ᵗ Γ,Δ′.Γ × Γ,Δ.Δ ≋ᵗ Γ,Δ′.Δ }
+  where
+  module Γ,Δ = Context Γ,Δ
+  module Γ,Δ′ = Context Γ,Δ′
+  _≋ᵗ_ = Pointwise _≈_
+
+_≲_ : ∀ {n} → Rel (Context n) (c ⊔ lsuc ℓ)
+Γ,Δ ≲ Γ,Δ′ = Σ (Γ,Δ.m ≡ Γ,Δ′.m) λ { refl → Γ,Δ.Γ ≲ᵗ Γ,Δ′.Γ × Γ,Δ.Δ ≲ᵗ Γ,Δ′.Δ }
+  where
+  module Γ,Δ = Context Γ,Δ
+  module Γ,Δ′ = Context Γ,Δ′
+  _≲ᵗ_ = Pointwise _≤ᵗ_

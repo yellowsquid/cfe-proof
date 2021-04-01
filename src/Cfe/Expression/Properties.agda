@@ -32,6 +32,8 @@ open import Relation.Binary.PropositionalEquality as ≡ using (_≡_)
 import Relation.Binary.Construct.On as On
 open import Relation.Nullary
 
+open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE using ([]; _∷_)
+
 isEquivalence : ∀ n → IsEquivalence (_≋_ {n})
 isEquivalence n = record
   { refl = λ γ → ≈-refl
@@ -97,9 +99,6 @@ isSemiring n = record
   module ∪-comm = IsCommutativeMonoid (∪.isCommutativeMonoid {c ⊔ ℓ})
 
 module _ where
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE
-  open import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
-
   cong-env : ∀ {n} → (e : Expression n) → ∀ {γ γ′} → γ VE.≋ γ′ → ⟦ e ⟧ γ ≈ ⟦ e ⟧ γ′
   cong-env ⊥ γ≈γ′ = ≈-refl
   cong-env ε γ≈γ′ = ≈-refl
@@ -131,13 +130,12 @@ wkn-no-use (Var j) i γ = reflexive (begin
   open IsEquivalence (≈-isEquivalence {c ⊔ ℓ})
   open ≡.≡-Reasoning
 wkn-no-use (μ e) i (z ∷ γ) = ⋃.⋃-cong (λ {x} {y} x≈y → begin
-  ⟦ wkn e (suc i) ⟧ (x ∷ z ∷ γ)      ≈⟨ cong-env (wkn e (suc i)) (x≈y ∷ ≋-refl) ⟩
+  ⟦ wkn e (suc i) ⟧ (x ∷ z ∷ γ)      ≈⟨ cong-env (wkn e (suc i)) (x≈y ∷ VE.≋-refl) ⟩
   ⟦ wkn e (suc i) ⟧ (y ∷ z ∷ γ)      ≈⟨ wkn-no-use e (suc i) (y ∷ z ∷ γ) ⟩
   ⟦ e ⟧ (remove (y ∷ z ∷ γ) (suc i)) ≡⟨⟩
   ⟦ e ⟧ (y ∷ remove (z ∷ γ) i)       ∎)
   where
   open import Relation.Binary.Reasoning.Setoid (L.setoid (c ⊔ ℓ))
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE
 
 subst-fun : ∀ {n} → (e : Expression (suc n)) → ∀ e′ i γ → ⟦ e [ e′ / i ] ⟧ γ ≈ ⟦ e ⟧ (insert γ i (⟦ e′ ⟧ γ))
 subst-fun ⊥ e′ i γ = ≈-refl
@@ -161,13 +159,12 @@ subst-fun (Var j) e′ i γ with i F.≟ j
   open ≡.≡-Reasoning
   open IsEquivalence (≈-isEquivalence {c ⊔ ℓ})
 subst-fun (μ e) e′ i γ = ⋃.⋃-cong λ {x} {y} x≈y → begin
-  ⟦ e [ wkn e′ F.zero / suc i ] ⟧ (x ∷ γ) ≈⟨ cong-env (e [ wkn e′ F.zero / suc i ]) (x≈y ∷ ≋-refl) ⟩
+  ⟦ e [ wkn e′ F.zero / suc i ] ⟧ (x ∷ γ) ≈⟨ cong-env (e [ wkn e′ F.zero / suc i ]) (x≈y ∷ VE.≋-refl) ⟩
   ⟦ e [ wkn e′ F.zero / suc i ] ⟧ (y ∷ γ) ≈⟨ subst-fun e (wkn e′ F.zero) (suc i) (y ∷ γ) ⟩
-  ⟦ e ⟧ (y ∷ insert γ i (⟦ wkn e′ F.zero ⟧ (y ∷ γ))) ≈⟨ cong-env e (≈-refl ∷ insert′ (wkn-no-use e′ F.zero (y ∷ γ)) ≋-refl i) ⟩
+  ⟦ e ⟧ (y ∷ insert γ i (⟦ wkn e′ F.zero ⟧ (y ∷ γ))) ≈⟨ cong-env e (≈-refl ∷ insert′ (wkn-no-use e′ F.zero (y ∷ γ)) VE.≋-refl i) ⟩
   ⟦ e ⟧ (y ∷ insert γ i (⟦ e′ ⟧ γ)) ∎
   where
   open import Relation.Binary.Reasoning.Setoid (L.setoid (c ⊔ ℓ))
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE
 
   insert′ : ∀ {n x y} {xs ys : Vec (Language (c ⊔ ℓ)) n} → x ≈ y → xs VE.≋ ys → (i : Fin (suc n)) → insert xs i x VE.≋ insert ys i y
   insert′ x≈y xs≋ys F.zero = x≈y ∷ xs≋ys
@@ -232,15 +229,9 @@ e₂<ᵣₐₙₖe₁∨e₂ e₁ e₂ = begin-strict
   where
   open ≤-Reasoning
 
--- ⟦ e ⟧ (⟦ μ e ⟧ [] ∷ []) ≤ ⟦ μ e ⟧ []
--- l ∈ ⟦ e ⟧ (⟦ μ e ⟧ [] ∷ []) → l ∈ ⟦ μ e ⟧ []
--- l ∈ ⟦ e ⟧ (⟦ μ e ⟧ [] ∷ []) → l ∈ ⋃ (λ x → ⟦ e ⟧ (x ∷ []))
--- l ∈ ⟦ e′ ⟧ (⟦ μ e ⟧ [] ∷ []) → ∃[ n ] l ∈ ⟦ e′ ⟧ ((λ X → ⟦ e ⟧ (X ∷ [])) ^ n ∷ [])
--- e-unroll : ∀ {n} (e : Expression (suc n)) e′ i γ → ⟦ e [ e′ / i ] ⟧ γ L.≤ ∃[ n ] (⟦ e ⟧ )
--- e-unroll ⊥ = ?
--- e-unroll ε = ?
--- e-unroll (Char x) = ?
--- e-unroll (e ∨ e₁) = {!!}
--- e-unroll (e ∙ e₁) = {!!}
--- e-unroll (Var x) = {!!}
--- e-unroll (μ e) = {!!}
+⟦e⟧ᵐ≈⟦expand[e,m]⟧ : ∀ {n} (e : Expression (suc n)) m γ → ((λ X → ⟦ e ⟧ (X ∷ γ)) ⋃.^ m) (⟦ ⊥ ⟧ γ) ≈ ⟦ expand e m ⟧ γ
+⟦e⟧ᵐ≈⟦expand[e,m]⟧ e ℕ.zero γ = ≈-refl
+⟦e⟧ᵐ≈⟦expand[e,m]⟧ e (suc m) γ =
+  ≈-trans
+    (cong-env e (⟦e⟧ᵐ≈⟦expand[e,m]⟧ e m γ ∷ VE.≋-refl))
+    (≈-sym (subst-fun e (expand e m) F.zero γ))

@@ -10,7 +10,7 @@ open Setoid over renaming (Carrier to C; _≈_ to _∼_)
 
 open import Cfe.Context over hiding (_≋_) renaming (≋-sym to ≋ᶜ-sym)
 open import Cfe.Expression over hiding (_≋_)
-open import Cfe.Language over hiding (≤-refl; _≈_; _<_)
+open import Cfe.Language over hiding (≤-refl; _<_) renaming (_≈_ to _≈ˡ_)
 open import Cfe.Language.Construct.Concatenate over using (Concat)
 open import Cfe.Language.Indexed.Construct.Iterate over
 open import Cfe.Judgement over renaming (wkn₁ to wkn₁ⱼ; shift≤ to shift≤ⱼ)
@@ -42,9 +42,6 @@ private
   _<_ : ∀ {m n} → REL (List C × Expression m) (List C × Expression n) _
   (l , e) < (l′ , e′) = length l ℕ.< length l′ ⊎ length l ≡ length l′ × e <ᵣₐₙₖ e′
 
-    _<ₙ_ : Rel (∃[ n ] List C × Expression n) _
-  nle <ₙ nle′ = proj₂ nle < proj₂ nle′
-
   <-wellFounded : ∀ {n} → WellFounded (_<_ {n})
   <-wellFounded = On.wellFounded (Product.map₁ length) (×-wellFounded <ⁿ-wellFounded <ᵣₐₙₖ-wellFounded)
 
@@ -54,7 +51,7 @@ unroll₁ : ∀ {n} {Γ,Δ : Context n} {e e′ τ τ′ i} (i≥m : toℕ i ℕ
           l ∈ ⟦ e ⟧ (insert γ i (⟦ μ e′ ⟧ γ)) →
           ∃[ n ] l ∈ ⟦ e ⟧ (insert γ i (((λ X → ⟦ e′ ⟧ (X ∷ γ)) ^ n) (Lift _ ∅)))
 unroll₁ {e = e} i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ {l = l} γ γ⊨Γ,Δ l∈⟦e⟧ =
-  All.wfRec <-wellFounded _ Pred {!!} (l , e) i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ l∈⟦e⟧
+  All.wfRec <-wellFounded _ Pred go (l , e) i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ l∈⟦e⟧
   where
   Pred : ∀ {n} → List C × Expression (ℕ.suc n) → Set _
   Pred {n} (l , e) =
@@ -62,7 +59,7 @@ unroll₁ {e = e} i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ {l = l} γ γ⊨Γ,�
     wkn₁ Γ,Δ i≥m τ′ ⊢ e ∶ τ → Γ,Δ ⊢ μ e′ ∶ τ′ →
     ∀ γ → PW.Pointwise _⊨_ γ (toVec Γ,Δ) →
     l ∈ ⟦ e ⟧ (insert γ i (⟦ μ e′ ⟧ γ)) →
-    ∃[ n ] l ∈ ⟦ e ⟧ (insert γ i (((λ X → ⟦ e′ ⟧ (X ∷ γ)) ^ n) (Lift _ ∅)))
+    ∃[ n ] l ∈ ⟦ e ⟧ (insert γ i (((λ X → ⟦ e′ ⟧ (X ∷ γ)) ^ n) (⟦ ⊥ ⟧ γ)))
 
   go : ∀ {n} l,e → WfRec _<_ (Pred {n}) l,e → Pred l,e
   go (l , ε) rec i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ l∈⟦e⟧ = 1 , l∈⟦e⟧
@@ -78,8 +75,13 @@ unroll₁ {e = e} i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ {l = l} γ γ⊨Γ,�
     l₁∈⟦e₁⟧′ = rec (l∈⟦e⟧.l₁ , e₁) {!!} i≥m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ l∈⟦e⟧.l₁∈A
     l₂∈⟦e₂⟧′ = rec (l∈⟦e⟧.l₂ , e₂) {!!} z≤n (congᶜ (shift≤-wkn₁-comm Γ,Δ z≤n i≥m τ′) Δ++Γ,∙⊢e₂∶τ₂) (shift≤ⱼ Γ,Δ⊢e′∶τ′ z≤n) γ (subst (PW.Pointwise _⊨_ γ) (≡.sym (shift≤-toVec Γ,Δ z≤n)) γ⊨Γ,Δ) l∈⟦e⟧.l₂∈B
   go (l , Var x) rec i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ l∈⟦e⟧ = {!!}
-  go (l , μ e) rec i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ (suc n , l∈⟦e⟧) =
-    Product.map₂ {!!} (rec (l , e [ μ e / F.zero ]) {!!} i≥m {!!} Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ {!!})
+  go (l , μ e) rec {e′ = e′} {i = i} i≥m Γ,Δ⊢e∶τ Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ (n , l∈⟦e⟧) =
+    m , n , _≈ˡ_.f⁻¹ (⟦e⟧ᵐ≈⟦expand[e,m]⟧ e n (insert γ i (((λ X → ⟦ e′ ⟧ (X ∷ γ)) ^ m) (⟦ ⊥ ⟧ γ)))) (proj₂ recced)
+    where
+    l∈⟦expand⟧ = _≈ˡ_.f (⟦e⟧ᵐ≈⟦expand[e,m]⟧ e n (insert γ i (⟦ μ e′ ⟧ γ))) l∈⟦e⟧
+    recced = rec (l , expand e n) (inj₂ (≡.refl , expand-smaller-rank Γ,Δ⊢e∶τ n)) i≥m {!!} Γ,Δ⊢e′∶τ′ γ γ⊨Γ,Δ l∈⟦expand⟧
+    m = proj₁ recced
+    l∈⟦expand⟧′ = proj₂ recced
 
 l∈⟦e⟧⇒e⤇l : ∀ {e τ} → ∙,∙ ⊢ e ∶ τ → ∀ {l} → l ∈ ⟦ e ⟧ [] → e ⤇ l
 l∈⟦e⟧⇒e⤇l {e} {τ} ∙,∙⊢e∶τ {l} l∈⟦e⟧ = All.wfRec <-wellFounded _ Pred go (l , e) ∙,∙⊢e∶τ l∈⟦e⟧
@@ -89,7 +91,7 @@ l∈⟦e⟧⇒e⤇l {e} {τ} ∙,∙⊢e∶τ {l} l∈⟦e⟧ = All.wfRec <-well
 
   e[μe/0]<μe : ∀ {e τ} l → ∙,∙ ⊢ μ e ∶ τ → (l , e [ μ e / F.zero ]) < (l , μ e)
   e[μe/0]<μe {e} l (Fix ∙,τ⊢e∶τ)= inj₂ (≡.refl , (begin-strict
-    rank (e [ μ e / F.zero ]) ≡⟨ subst-preserves-rank z≤n ∙,τ⊢e∶τ (Fix ∙,τ⊢e∶τ) ⟩
+    rank (e [ μ e / F.zero ]) ≡⟨ subst-preserves-rank z≤n ∙,τ⊢e∶τ ⟩
     rank e                    <⟨ n<1+n (rank e) ⟩
     ℕ.suc (rank e)            ≡⟨⟩
     rank (μ e)                ∎))

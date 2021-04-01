@@ -13,13 +13,13 @@ open import Cfe.Context over as C
 open import Cfe.Expression over as E
 open import Cfe.Judgement.Base over
 open import Cfe.Language over
-open import Cfe.Type over
-open import Cfe.Type.Construct.Lift over
+open import Cfe.Type over renaming (_≤_ to _≤ᵗ_; ≤-min to ≤ᵗ-min)
+open import Cfe.Type.Construct.Lift over renaming (Lift to Liftᵗ)
 open import Data.Empty
 open import Data.Fin as F hiding (splitAt)
 open import Data.Fin.Properties hiding (≤-refl; ≤-trans; ≤-irrelevant)
 open import Data.Nat as ℕ hiding (_⊔_)
-open import Data.Nat.Properties renaming (≤-refl to ≤ⁿ-refl; ≤-trans to ≤ⁿ-trans; ≤-irrelevant to ≤ⁿ-irrelevant)
+open import Data.Nat.Properties renaming (≤-refl to ≤ⁿ-refl; ≤-trans to ≤ⁿ-trans; ≤-irrelevant to ≤ⁿ-irrelevant; ≤-reflexive to ≤ⁿ-reflexive)
 open import Data.Product
 open import Data.Vec
 open import Data.Vec.Properties
@@ -192,21 +192,34 @@ soundness (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ
 
 subst-preserves-rank : ∀ {n} {Γ,Δ : Context n} {e τ i τ′} (i≤m : toℕ i ℕ.≤ _) →
   C.wkn₂ Γ,Δ i≤m τ′ ⊢ e ∶ τ →
-  ∀ {e′} → shift Γ,Δ ⊢ e′ ∶ τ′ →
-  rank (e [ e′ / i ]) ≡ rank e
-subst-preserves-rank i≤m Eps Γ,Δ⊢e′∶τ′ = refl
-subst-preserves-rank i≤m (Char c) Γ,Δ⊢e′∶τ′ = refl
-subst-preserves-rank i≤m Bot Γ,Δ⊢e′∶τ′ = refl
-subst-preserves-rank {i = i} i≤m (Var {i = j} j>m) Γ,Δ⊢e′∶τ′ with i F.≟ j
+  ∀ {e′} → rank (e [ e′ / i ]) ≡ rank e
+subst-preserves-rank i≤m Eps = refl
+subst-preserves-rank i≤m (Char c) = refl
+subst-preserves-rank i≤m Bot = refl
+subst-preserves-rank {i = i} i≤m (Var {i = j} j>m) with i F.≟ j
 ... | yes refl = ⊥-elim (<⇒≱ j>m i≤m)
 ... | no i≢j = refl
-subst-preserves-rank {Γ,Δ = Γ,Δ} {τ = τ} {τ′ = τ′} i≤m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ =
+subst-preserves-rank {Γ,Δ = Γ,Δ} {τ = τ} {τ′ = τ′} i≤m (Fix Γ,Δ⊢e∶τ) =
   cong suc (subst-preserves-rank {Γ,Δ = cons Γ,Δ τ} (s≤s i≤m)
-    (congᶜ (≋ᶜ-sym (wkn₂-comm Γ,Δ z≤n i≤m τ τ′)) Γ,Δ⊢e∶τ)
-    (congᶜ (≋ᶜ-sym (shift≤-wkn₂-comm-≤ Γ,Δ z≤n z≤n τ)) (wkn₁ Γ,Δ⊢e′∶τ′ z≤n τ)))
-subst-preserves-rank i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ =
-  cong suc (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
-subst-preserves-rank i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ =
+    (congᶜ (≋ᶜ-sym (wkn₂-comm Γ,Δ z≤n i≤m τ τ′)) Γ,Δ⊢e∶τ))
+subst-preserves-rank i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) =
+  cong suc (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁)
+subst-preserves-rank i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) =
   cong₂ (λ x y → suc (x ℕ.+ y))
-        (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
-        (subst-preserves-rank i≤m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′)
+        (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁)
+        (subst-preserves-rank i≤m Γ,Δ⊢e₂∶τ₂)
+
+-- lessen-env : ∀ {n} {Γ,Δ : Context n}
+
+expand-ty : ∀ {n} {Γ,Δ : Context n} {e τ} →
+  Γ,Δ ⊢ μ e ∶ τ → ∀ m → ∃[ τ′ ] (τ′ ≤ᵗ τ) × (Γ,Δ ⊢ expand e m ∶ τ′)
+expand-ty (Fix Γ,Δ⊢e∶τ) ℕ.zero = Liftᵗ ℓ ℓ τ⊥ , {!≤ᵗ-min!} , Bot
+-- e [ expand e m / 0 ] ∶ τ′
+-- expand e m ∶ τ′′ ≤ τ
+-- e [ τ′ ] : τ → τ′′ ≤ τ′ → τ′′′ ≤ τ × e [ τ′′ ] ∶ τ′′′
+expand-ty (Fix Γ,Δ⊢e∶τ) (suc m) = {!!}
+
+expand-smaller-rank : ∀ {n} {Γ,Δ : Context n} {e τ} →
+  Γ,Δ ⊢ μ e ∶ τ → ∀ m → rank (expand e m) ℕ.< rank (μ e)
+expand-smaller-rank (Fix Γ,Δ⊢e∶τ) ℕ.zero = s≤s z≤n
+expand-smaller-rank (Fix Γ,Δ⊢e∶τ) (suc m) = s≤s (≤ⁿ-reflexive (subst-preserves-rank z≤n Γ,Δ⊢e∶τ))

@@ -27,6 +27,7 @@ infix 10 _[_/_]
 infix 7 _∙_
 infix 6 _∨_
 infix 4 _≋_
+infix 4 _<ᵣₐₙₖ_
 
 data Expression : ℕ → Set c where
   ⊥ : ∀ {n} → Expression n
@@ -98,7 +99,9 @@ rank (e₁ ∙ _) = suc (rank e₁)
 rank (Var _) = 0
 rank (μ e) = suc (rank e)
 
-infix 4 _<ᵣₐₙₖ_
-
 _<ᵣₐₙₖ_ : ∀ {m n} → REL (Expression m) (Expression n) _
 e <ᵣₐₙₖ e′ = rank e ℕ.< rank e′
+
+expand : {n : ℕ} → Expression (suc n) → ℕ → Expression n
+expand e ℕ.zero = ⊥
+expand e (suc m) = e [ expand e m / F.zero ]
