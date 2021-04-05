@@ -1,6 +1,6 @@
 {-# OPTIONS --without-K --safe #-}
 
-open import Relation.Binary
+open import Relation.Binary using (REL; Setoid; _⟶_Respects_)
 
 module Cfe.Language.Base
   {c ℓ} (over : Setoid c ℓ)
@@ -8,73 +8,138 @@ module Cfe.Language.Base
 
 open Setoid over using () renaming (Carrier to C)
 
-open import Algebra
-open import Data.Empty
-open import Data.List hiding (null)
+open import Cfe.Function.Power
+open import Data.Empty.Polymorphic using (⊥)
+open import Data.List
 open import Data.List.Relation.Binary.Equality.Setoid over
 open import Data.Product
-open import Data.Unit using (⊤; tt)
-open import Function hiding (_⟶_)
-open import Level as L hiding (Lift)
-open import Relation.Binary.PropositionalEquality
+open import Data.Sum
+open import Function
+open import Level
+open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Nullary using (Dec; ¬_)
 
-infix 4 _∈_
-infix 4 _∉_
-infix 4 _≈_
-infix 4 _≤_
+private
+  variable
+    a b : Level
+
+------------------------------------------------------------------------
+-- Definition
 
 record Language a : Set (c ⊔ ℓ ⊔ suc a) where
   field
-    𝕃 : List C → Set a
+    𝕃        : List C → Set a
     ∈-resp-≋ : 𝕃 ⟶ 𝕃 Respects _≋_
 
-∅ : Language 0ℓ
+------------------------------------------------------------------------
+-- Special Languages
+
+∅ : Language a
 ∅ = record
-  { 𝕃 = const ⊥
+  { 𝕃        = const ⊥
   ; ∈-resp-≋ = λ _ ()
   }
 
-｛ε｝ : Language c
-｛ε｝ = record
-  { 𝕃 = [] ≡_
-  ; ∈-resp-≋ = λ { [] refl → refl}
+｛ε｝ : Language (c ⊔ a)
+｛ε｝ {a} = record
+  { 𝕃        = Lift a ∘ ([] ≡_)
+  ; ∈-resp-≋ = λ { [] → id }
   }
 
-Lift : ∀ {a} → (b : Level) → Language a → Language (a ⊔ b)
-Lift b A = record
-  { 𝕃 = L.Lift b ∘ A.𝕃
-  ; ∈-resp-≋ = λ { eq (lift l∈A) → lift (A.∈-resp-≋ eq l∈A)}
+｛_｝ : C → Language _
+｛ c ｝ = record
+  { 𝕃        = [ c ] ≋_
+  ; ∈-resp-≋ = λ l₁≋l₂ l₁∈｛c｝ → ≋-trans l₁∈｛c｝ l₁≋l₂
   }
-  where
-  module A = Language A
 
-_∈_ : ∀ {a} → List C → Language a → Set a
+------------------------------------------------------------------------
+-- Membership
+
+infix 4 _∈_ _∉_
+
+_∈_ : List C → Language a → Set _
 _∈_ = flip Language.𝕃
 
-_∉_ : ∀ {a} → List C → Language a → Set a
-l ∉ A = l ∈ A → ⊥
+_∉_ : List C → Language a → Set _
+w ∉ A = ¬ w ∈ A
 
-record _≤_ {a b} (A : Language a) (B : Language b) : Set (c ⊔ a ⊔ b) where
-  field
-    f : ∀ {l} → l ∈ A → l ∈ B
+------------------------------------------------------------------------
+-- Language Combinators
 
-record _≈_ {a b} (A : Language a) (B : Language b) : Set (c ⊔ ℓ ⊔ a ⊔ b) where
-  field
-    f : ∀ {l} → l ∈ A → l ∈ B
-    f⁻¹ : ∀ {l} → l ∈ B → l ∈ A
+infix 7 _∙_
+infix 6 _∪_
+infix 5 ⋃_
 
-record _<_ {a b} (A : Language a) (B : Language b) : Set (c ⊔ ℓ ⊔ a ⊔ b) where
-  field
-    f : ∀ {l} → l ∈ A → l ∈ B
-    l : List C
-    l∉A : l ∉ A
-    l∈B : l ∈ B
+_∙_ : Language a → Language b → Language _
+A ∙ B = record
+  { 𝕃        = λ w → ∃₂ λ w₁ w₂ → w₁ ∈ A × w₂ ∈ B × w₁ ++ w₂ ≋ w
+  ; ∈-resp-≋ = λ w≋w′ (_ , _ , w₁∈A , w₂∈B , eq) → -, -, w₁∈A , w₂∈B , ≋-trans eq w≋w′
+  }
 
-null : ∀ {a} → Language a → Set a
-null A = [] ∈ A
+_∪_ : Language a → Language b → Language _
+A ∪ B = record
+  { 𝕃        = λ w → w ∈ A ⊎ w ∈ B
+  ; ∈-resp-≋ = uncurry Data.Sum.map ∘ < Language.∈-resp-≋ A , Language.∈-resp-≋ B >
+  }
 
-first : ∀ {a} → Language a → C → Set (c ⊔ a)
-first A x = ∃[ l ] x ∷ l ∈ A
+Sup : (Language a → Language a) → Language a → Language _
+Sup F A = record
+  { 𝕃        = λ w → ∃[ n ] w ∈ (F ^ n) A
+  ; ∈-resp-≋ = λ w≋w′ (n , w∈FⁿA) → n , Language.∈-resp-≋ ((F ^ n) A) w≋w′ w∈FⁿA
+  }
 
-flast : ∀ {a} → Language a → C → Set (c ⊔ a)
-flast A x = ∃[ l ] (l ≢ [] × l ∈ A × ∃[ l′ ] l ++ x ∷ l′ ∈ A)
+⋃_ : (Language a → Language a) → Language _
+⋃ F = Sup F ∅
+
+------------------------------------------------------------------------
+-- Relations
+
+infix 4 _⊆_ _≈_
+
+data _⊆_ {a b} : REL (Language a) (Language b) (c ⊔ ℓ ⊔ suc (a ⊔ b)) where
+  sub : ∀ {A : Language a} {B : Language b} → (∀ {w} → w ∈ A → w ∈ B) → A ⊆ B
+
+_⊇_ : REL (Language a) (Language b) _
+_⊇_ = flip _⊆_
+
+_≈_ : REL (Language a) (Language b) _
+A ≈ B = A ⊆ B × B ⊆ A
+
+_≉_ : REL (Language a) (Language b) _
+A ≉ B = ¬ A ≈ B
+
+------------------------------------------------------------------------
+-- Membership Properties
+
+-- Contains empty string
+
+Null : ∀ {a} → Language a → Set a
+Null A = [] ∈ A
+
+-- Characters that start strings
+
+First : ∀ {a} → Language a → C → Set (c ⊔ a)
+First A c = ∃[ w ] c ∷ w ∈ A
+
+-- Characters that can follow a string to make another string in the language
+
+Flast : ∀ {a} → Language a → C → Set (c ⊔ a)
+Flast A c = ∃₂ λ c′ w → (c′ ∷ w ∈ A × ∃[ w′ ] c′ ∷ w ++ c ∷ w′ ∈ A)
+
+------------------------------------------------------------------------
+-- Proof Properties
+
+-- Membership is decidable
+
+Decidable : Language a → Set _
+Decidable A = ∀ w → Dec (w ∈ A)
+
+-- Membership proofs are irrelevant
+
+Irrelevant : Language a → Set _
+Irrelevant A = ∀ {w} → (p q : w ∈ A) → p ≡ q
+
+-- Membership proofs are recomputable
+
+Recomputable : Language a → Set _
+Recomputable A = ∀ {w} → .(w ∈ A) → w ∈ A
