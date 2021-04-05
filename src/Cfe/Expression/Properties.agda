@@ -6,228 +6,494 @@ module Cfe.Expression.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open Setoid over using () renaming (Carrier to C)
+open Setoid over using () renaming (_≈_ to _∼_)
 
 open import Algebra
-open import Cfe.Expression.Base over as E
-open import Cfe.Language over as L
-import Cfe.Language.Construct.Concatenate over as ∙
-import Cfe.Language.Construct.Union over as ∪
-import Cfe.Language.Indexed.Construct.Iterate over as ⋃
-open import Data.Fin as F
-open import Data.Fin.Properties
-open import Data.Nat as ℕ hiding (_⊔_)
-open import Data.Nat.Induction
-open import Data.Nat.Properties using (m≤m+n; m≤n+m; n<1+n; module ≤-Reasoning)
-open import Data.Product
-open import Data.Sum
-open import Data.Unit
+open import Cfe.Expression.Base over
+open import Cfe.Function.Power
+open import Cfe.Language over
+  hiding
+    ( ≈-isPartialEquivalence; partialSetoid
+    ; ∙-isMagma; ∙-isSemigroup; ∙-isMonoid; ∙-magma; ∙-semigroup; ∙-monoid
+    )
+  renaming
+  ( _≈_ to _≈ˡ_
+  ; ≈-refl to ≈ˡ-refl
+  ; ≈-sym to ≈ˡ-sym
+  ; ≈-trans to ≈ˡ-trans
+  ; ≈-isEquivalence to ≈ˡ-isEquivalence
+  ; setoid to setoidˡ
+  ; _∙_ to _∙ˡ_
+  ; ∙-cong to ∙ˡ-cong
+  ; ∙-assoc to ∙ˡ-assoc
+  ; ∙-identityˡ to ∙ˡ-identityˡ
+  ; ∙-identityʳ to ∙ˡ-identityʳ
+  ; ∙-identity to ∙ˡ-identity
+  ; ∙-zeroˡ to ∙ˡ-zeroˡ
+  ; ∙-zeroʳ to ∙ˡ-zeroʳ
+  ; ∙-zero to ∙ˡ-zero
+  )
+open import Data.Empty using (⊥-elim)
+open import Data.Fin hiding (_+_)
+open import Data.Nat hiding (_≟_; _⊔_; _^_)
+open import Data.Nat.Properties hiding (_≟_)
+open import Data.Product using (_,_)
 open import Data.Vec
 open import Data.Vec.Properties
-import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
-open import Function
-open import Induction.WellFounded
-open import Level renaming (suc to lsuc)
-open import Relation.Binary.PropositionalEquality as ≡ using (_≡_)
-import Relation.Binary.Construct.On as On
-open import Relation.Nullary
+open import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
+  hiding (refl; sym; setoid; lookup)
+open import Level using (_⊔_)
+open import Relation.Binary.PropositionalEquality hiding (setoid)
+open import Relation.Nullary using (yes; no)
 
-isEquivalence : ∀ n → IsEquivalence (_≋_ {n})
-isEquivalence n = record
-  { refl = λ γ → ≈-refl
-  ; sym = λ x≋y γ → ≈-sym (x≋y γ)
-  ; trans = λ x≋y y≋z γ → ≈-trans (x≋y γ) (y≋z γ)
+private
+  variable
+    k m n : ℕ
+
+  ≈ˡ-reflexive = IsEquivalence.reflexive (≈ˡ-isEquivalence {c ⊔ ℓ})
+
+------------------------------------------------------------------------
+-- Properties of ⟦_⟧
+------------------------------------------------------------------------
+-- Algebraic properties of ⟦_⟧
+
+⟦⟧-mono-env : ∀ (e : Expression n) {γ γ′} → Pointwise _⊆_ γ γ′ → ⟦ e ⟧ γ ⊆ ⟦ e ⟧ γ′
+⟦⟧-mono-env ⊥         mono = ⊆-refl
+⟦⟧-mono-env ε         mono = ⊆-refl
+⟦⟧-mono-env (Char _)  mono = ⊆-refl
+⟦⟧-mono-env (e₁ ∨ e₂) mono = ∪-mono (⟦⟧-mono-env e₁ mono) (⟦⟧-mono-env e₂ mono)
+⟦⟧-mono-env (e₁ ∙ e₂) mono = ∙-mono (⟦⟧-mono-env e₁ mono) (⟦⟧-mono-env e₂ mono)
+⟦⟧-mono-env (Var j)   mono = PW.lookup mono j
+⟦⟧-mono-env (μ e)     mono = ⋃-mono λ A⊆B → ⟦⟧-mono-env e (A⊆B ∷ mono)
+
+⟦⟧-cong-env : ∀ (e : Expression n) {γ γ′} → Pointwise _≈ˡ_ γ γ′ → ⟦ e ⟧ γ ≈ˡ ⟦ e ⟧ γ′
+⟦⟧-cong-env ⊥         cong = ≈ˡ-refl
+⟦⟧-cong-env ε         cong = ≈ˡ-refl
+⟦⟧-cong-env (Char _)  cong = ≈ˡ-refl
+⟦⟧-cong-env (e₁ ∨ e₂) cong = ∪-cong (⟦⟧-cong-env e₁ cong) (⟦⟧-cong-env e₂ cong)
+⟦⟧-cong-env (e₁ ∙ e₂) cong = ∙ˡ-cong (⟦⟧-cong-env e₁ cong) (⟦⟧-cong-env e₂ cong)
+⟦⟧-cong-env (Var j)   cong = PW.lookup cong j
+⟦⟧-cong-env (μ e)     cong = ⋃-cong λ A≈B → ⟦⟧-cong-env e (A≈B ∷ cong)
+
+------------------------------------------------------------------------
+-- Properties of _≈_
+------------------------------------------------------------------------
+-- Relational properties
+
+≈-refl : Reflexive (_≈_ {n})
+≈-refl _ = ≈ˡ-refl
+
+≈-sym : Symmetric (_≈_ {n})
+≈-sym e≈e′ γ = ≈ˡ-sym (e≈e′ γ)
+
+≈-trans : Transitive (_≈_ {n})
+≈-trans e≈e′ e′≈e′′ γ = ≈ˡ-trans (e≈e′ γ) (e′≈e′′ γ)
+
+------------------------------------------------------------------------
+-- Structures
+
+≈-isPartialEquivalence : IsPartialEquivalence (_≈_ {n})
+≈-isPartialEquivalence {n} = record
+  { sym   = λ {e} {e′} → ≈-sym {n} {e} {e′}
+  ; trans = λ {e} {e′} {e′′} → ≈-trans {n} {e} {e′} {e′′}
   }
 
-isSemiring : ∀ n → IsSemiring (_≋_ {n}) _∨_ _∙_ ⊥ ε
-isSemiring n = record
-  { isSemiringWithoutAnnihilatingZero = record
-    { +-isCommutativeMonoid = record
-      { isMonoid = record
-        { isSemigroup = record
-          { isMagma = record
-            { isEquivalence = isEquivalence n
-            ; ∙-cong = λ x≋y u≋v γ → ∪-comm.∙-cong (x≋y γ) (u≋v γ)
-            }
-          ; assoc = λ x y z γ → ∪-comm.assoc (⟦ x ⟧ γ) (⟦ y ⟧ γ) (⟦ z ⟧ γ)
-          }
-        ; identity = (λ x γ → ∪-comm.identityˡ (⟦ x ⟧ γ)) , (λ x γ → ∪-comm.identityʳ (⟦ x ⟧ γ))
-        }
-      ; comm = λ x y γ → ∪-comm.comm (⟦ x ⟧ γ) (⟦ y ⟧ γ)
-      }
-    ; *-isMonoid = record
-      { isSemigroup = record
-        { isMagma = record
-          { isEquivalence = isEquivalence n
-          ; ∙-cong = λ x≋y u≋v γ → ∙.∙-cong {c ⊔ ℓ} (x≋y γ) (u≋v γ)
-          }
-        ; assoc = λ x y z γ → ∙.∙-assoc (⟦ x ⟧ γ) (⟦ y ⟧ γ) (⟦ z ⟧ γ)
-        }
-      ; identity = (λ x γ → ∙.∙-identityˡ {ℓ} (⟦ x ⟧ γ)) , (λ x γ → ∙.∙-identityʳ {ℓ} (⟦ x ⟧ γ))
-      }
-    ; distrib = (λ x y z γ → record
-      { f = λ
-        { record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₁ l₂∈⟦y⟧ ; eq = eq } → inj₁ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦y⟧ ; eq = eq }
-        ; record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₂ l₂∈⟦z⟧ ; eq = eq } → inj₂ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦z⟧ ; eq = eq }
-        }
-      ; f⁻¹ = λ
-        { (inj₁ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦y⟧ ; eq = eq }) → record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₁ l₂∈⟦y⟧ ; eq = eq }
-        ; (inj₂ record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = l₂∈⟦z⟧ ; eq = eq }) → record { l₁∈A = l₁∈⟦x⟧ ; l₂∈B = inj₂ l₂∈⟦z⟧ ; eq = eq }
-        }
-      }) , (λ x y z γ → record
-      { f = λ
-        { record { l₁∈A = inj₁ l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq } → inj₁ record { l₁∈A = l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
-        ; record { l₁∈A = inj₂ l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq } → inj₂ record { l₁∈A = l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
-        }
-      ; f⁻¹ = λ
-        { (inj₁ record { l₁∈A = l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }) → record { l₁∈A = inj₁ l₁∈⟦y⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
-        ; (inj₂ record { l₁∈A = l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }) → record { l₁∈A = inj₂ l₁∈⟦z⟧ ; l₂∈B = l₂∈⟦x⟧ ; eq = eq }
-        }
-      })
-    }
-  ; zero = (λ x γ → record
-    { f = λ ()
-    ; f⁻¹ = λ ()
-    }) , (λ x γ → record
-    { f = λ ()
-    ; f⁻¹ = λ ()
+≈-isEquivalence : IsEquivalence (_≈_ {n})
+≈-isEquivalence {n} = record
+  { refl  = λ {e} → ≈-refl {n} {e}
+  ; sym   = λ {e} {e′} → ≈-sym {n} {e} {e′}
+  ; trans = λ {e} {e′} {e′′} → ≈-trans {n} {e} {e′} {e′′}
+  }
+
+-- Bundles
+
+partialSetoid : ∀ {n} → PartialSetoid _ _
+partialSetoid {n} = record { isPartialEquivalence = ≈-isPartialEquivalence {n} }
+
+setoid : ∀ {n} → Setoid _ _
+setoid {n} = record { isEquivalence = ≈-isEquivalence {n} }
+
+------------------------------------------------------------------------
+-- Properties of _<ᵣₐₙₖ_
+------------------------------------------------------------------------
+-- Relational properties
+
+<ᵣₐₙₖ-trans : Trans (_<ᵣₐₙₖ_ {k}) (_<ᵣₐₙₖ_ {m} {n}) _<ᵣₐₙₖ_
+<ᵣₐₙₖ-trans = <-trans
+
+<ᵣₐₙₖ-asym : Asymmetric (_<ᵣₐₙₖ_ {n})
+<ᵣₐₙₖ-asym = <-asym
+
+------------------------------------------------------------------------
+-- Other properties
+
+rank-∨ˡ : ∀ (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∨ e₂
+rank-∨ˡ e₁ e₂ = begin-strict
+  rank e₁           ≤⟨ m≤m+n (rank e₁) (rank e₂) ⟩
+  rank e₁ + rank e₂ <⟨ n<1+n (rank e₁ + rank e₂) ⟩
+  rank (e₁ ∨ e₂)    ∎
+  where
+  open ≤-Reasoning
+
+rank-∨ʳ : ∀ (e₁ e₂ : Expression n) → e₂ <ᵣₐₙₖ e₁ ∨ e₂
+rank-∨ʳ e₁ e₂ = begin-strict
+  rank e₂           ≤⟨ m≤n+m (rank e₂) (rank e₁) ⟩
+  rank e₁ + rank e₂ <⟨ n<1+n (rank e₁ + rank e₂) ⟩
+  rank (e₁ ∨ e₂)    ∎
+  where
+  open ≤-Reasoning
+
+rank-∙ˡ : ∀ (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∙ e₂
+rank-∙ˡ e₁ _ = n<1+n (rank e₁)
+
+rank-μ : ∀ (e : Expression (suc n)) → e <ᵣₐₙₖ μ e
+rank-μ e = n<1+n (rank e)
+
+------------------------------------------------------------------------
+-- Properties of Char
+------------------------------------------------------------------------
+-- Functional properties
+
+Char-cong : ∀ {c c′} → c ∼ c′ → Char {n} c ≈ Char c′
+Char-cong c∼c′ _ = ｛｝-cong c∼c′
+
+Char-inj : ∀ {c c′} → Char {n} c ≈ Char c′ → c ∼ c′
+Char-inj c≈c′ = ｛｝-inj (c≈c′ (replicate ∅))
+
+------------------------------------------------------------------------
+-- Properties of Var
+------------------------------------------------------------------------
+-- Functional properties
+
+Var-cong : ∀ {j k} → j ≡ k → Var {n} j ≈ Var k
+Var-cong {n} {j} refl = ≈-refl {n} {Var j}
+
+Var-inj : ∀ {j k} → Var {n} j ≈ Var k → j ≡ k
+Var-inj {.(suc _)} {zero}  {zero}  j≈k = refl
+Var-inj {.(suc _)} {zero}  {suc k} j≈k = ⊥-elim (ε∉∅ (Null-resp-≈ ｛ε｝≈∅ ε∈｛ε｝))
+  where
+  open import Relation.Binary.Reasoning.Setoid setoidˡ
+  ｛ε｝≈∅ = begin
+    ｛ε｝ {ℓ}              ≈⟨ j≈k (｛ε｝ ∷ replicate ∅) ⟩
+    lookup (replicate ∅) k ≡⟨ lookup-replicate k ∅ ⟩
+    ∅                      ∎
+Var-inj {.(suc _)} {suc j} {zero}  j≈k = ⊥-elim (ε∉∅ (Null-resp-≈ ｛ε｝≈∅ ε∈｛ε｝))
+  where
+  open import Relation.Binary.Reasoning.Setoid setoidˡ
+  ｛ε｝≈∅ = begin
+    ｛ε｝ {ℓ}                  ≡˘⟨ lookup-replicate j ｛ε｝ ⟩
+    lookup (replicate ｛ε｝) j ≈⟨ j≈k (∅ ∷ replicate ｛ε｝) ⟩
+    ∅                          ∎
+Var-inj {.(suc _)} {suc j} {suc k} j≈k = cong suc (Var-inj λ γ → j≈k (∅ ∷ γ))
+
+------------------------------------------------------------------------
+-- Properties of _∙_
+------------------------------------------------------------------------
+-- Algebraic properties
+
+∙-cong : Congruent₂ (_≈_ {n}) _∙_
+∙-cong e₁≈e₁′ e₂≈e₂′ γ = ∙ˡ-cong (e₁≈e₁′ γ) (e₂≈e₂′ γ)
+
+∙-assoc : Associative (_≈_ {n}) _∙_
+∙-assoc e₁ e₂ e₃ γ = ∙ˡ-assoc (⟦ e₁ ⟧ γ) (⟦ e₂ ⟧ γ) (⟦ e₃ ⟧ γ)
+
+∙-identityˡ : LeftIdentity (_≈_ {n}) ε _∙_
+∙-identityˡ e γ = ∙ˡ-identityˡ (⟦ e ⟧ γ)
+
+∙-identityʳ : RightIdentity (_≈_ {n}) ε _∙_
+∙-identityʳ e γ = ∙ˡ-identityʳ (⟦ e ⟧ γ)
+
+∙-identity : Identity (_≈_ {n}) ε _∙_
+∙-identity = ∙-identityˡ , ∙-identityʳ
+
+∙-zeroˡ : LeftZero (_≈_ {n}) ⊥ _∙_
+∙-zeroˡ e γ = ∙ˡ-zeroˡ (⟦ e ⟧ γ)
+
+∙-zeroʳ : RightZero (_≈_ {n}) ⊥ _∙_
+∙-zeroʳ e γ = ∙ˡ-zeroʳ (⟦ e ⟧ γ)
+
+∙-zero : Zero (_≈_ {n}) ⊥ _∙_
+∙-zero = ∙-zeroˡ , ∙-zeroʳ
+
+-- Structures
+
+∙-isMagma : IsMagma (_≈_ {n}) _∙_
+∙-isMagma {n} = record
+  { isEquivalence = ≈-isEquivalence
+  ; ∙-cong = λ {e₁} {e₁′} {e₂} {e₂′} → ∙-cong {n} {e₁} {e₁′} {e₂} {e₂′}
+  }
+
+∙-isSemigroup : IsSemigroup (_≈_ {n}) _∙_
+∙-isSemigroup = record
+  { isMagma = ∙-isMagma
+  ; assoc   = ∙-assoc
+  }
+
+∙-isMonoid : IsMonoid (_≈_ {n}) _∙_ ε
+∙-isMonoid = record
+  { isSemigroup = ∙-isSemigroup
+  ; identity    = ∙-identity
+  }
+
+-- Bundles
+
+∙-magma : ∀ {n : ℕ} → Magma _ _
+∙-magma {n} = record { isMagma = ∙-isMagma {n} }
+
+∙-semigroup : ∀ {n : ℕ} → Semigroup _ _
+∙-semigroup {n} = record { isSemigroup = ∙-isSemigroup {n} }
+
+∙-monoid : ∀ {n : ℕ} → Monoid _ _
+∙-monoid {n} = record { isMonoid = ∙-isMonoid {n} }
+
+------------------------------------------------------------------------
+-- Properties of _∨_
+------------------------------------------------------------------------
+-- Algebraic properties
+
+∨-cong : Congruent₂ (_≈_ {n}) _∨_
+∨-cong e₁≈e₁′ e₂≈e₂′ γ = ∪-cong (e₁≈e₁′ γ) (e₂≈e₂′ γ)
+
+∨-assoc : Associative (_≈_ {n}) _∨_
+∨-assoc e₁ e₂ e₃ γ = ∪-assoc (⟦ e₁ ⟧ γ) (⟦ e₂ ⟧ γ) (⟦ e₃ ⟧ γ)
+
+∨-comm : Commutative (_≈_ {n}) _∨_
+∨-comm e₁ e₂ γ = ∪-comm (⟦ e₁ ⟧ γ) (⟦ e₂ ⟧ γ)
+
+∨-identityˡ : LeftIdentity (_≈_ {n}) ⊥ _∨_
+∨-identityˡ e γ = ∪-identityˡ (⟦ e ⟧ γ)
+
+∨-identityʳ : RightIdentity (_≈_ {n}) ⊥ _∨_
+∨-identityʳ e γ = ∪-identityʳ (⟦ e ⟧ γ)
+
+∨-identity : Identity (_≈_ {n}) ⊥ _∨_
+∨-identity = ∨-identityˡ , ∨-identityʳ
+
+∙-distribˡ-∨ : _DistributesOverˡ_ (_≈_ {n}) _∙_ _∨_
+∙-distribˡ-∨ e₁ e₂ e₃ γ = ∙-distribˡ-∪ (⟦ e₁ ⟧ γ) (⟦ e₂ ⟧ γ) (⟦ e₃ ⟧ γ)
+
+∙-distribʳ-∨ : _DistributesOverʳ_ (_≈_ {n}) _∙_ _∨_
+∙-distribʳ-∨ e₁ e₂ e₃ γ = ∙-distribʳ-∪ (⟦ e₁ ⟧ γ) (⟦ e₂ ⟧ γ) (⟦ e₃ ⟧ γ)
+
+∙-distrib-∨ : _DistributesOver_ (_≈_ {n}) _∙_ _∨_
+∙-distrib-∨ = ∙-distribˡ-∨ , ∙-distribʳ-∨
+
+∨-idem : Idempotent (_≈_ {n}) _∨_
+∨-idem e γ = ∪-idem (⟦ e ⟧ γ)
+
+-- Structures
+
+∨-isMagma : IsMagma (_≈_ {n}) _∨_
+∨-isMagma {n} = record
+  { isEquivalence = ≈-isEquivalence
+  ; ∙-cong        = λ {e₁} {e₁′} {e₂} {e₂′} → ∨-cong {n} {e₁} {e₁′} {e₂} {e₂′}
+  }
+
+∨-isCommutativeMagma : IsCommutativeMagma (_≈_ {n}) _∨_
+∨-isCommutativeMagma = record
+  { isMagma = ∨-isMagma
+  ; comm    = ∨-comm
+  }
+
+∨-isSemigroup : IsSemigroup (_≈_ {n}) _∨_
+∨-isSemigroup = record
+  { isMagma = ∨-isMagma
+  ; assoc   = ∨-assoc
+  }
+
+∨-isBand : IsBand (_≈_ {n}) _∨_
+∨-isBand = record
+  { isSemigroup = ∨-isSemigroup
+  ; idem        = ∨-idem
+  }
+
+∨-isCommutativeSemigroup : IsCommutativeSemigroup (_≈_ {n}) _∨_
+∨-isCommutativeSemigroup = record
+  { isSemigroup = ∨-isSemigroup
+  ; comm        = ∨-comm
+  }
+
+∨-isSemilattice : IsSemilattice (_≈_ {n}) _∨_
+∨-isSemilattice = record
+  { isBand = ∨-isBand
+  ; comm   = ∨-comm
+  }
+
+∨-isMonoid : IsMonoid (_≈_ {n}) _∨_ ⊥
+∨-isMonoid = record
+  { isSemigroup = ∨-isSemigroup
+  ; identity    = ∨-identity
+  }
+
+∨-isCommutativeMonoid : IsCommutativeMonoid (_≈_ {n}) _∨_ ⊥
+∨-isCommutativeMonoid = record
+  { isMonoid = ∨-isMonoid
+  ; comm     = ∨-comm
+  }
+
+∨-isIdempotentCommutativeMonoid : IsIdempotentCommutativeMonoid (_≈_ {n}) _∨_ ⊥
+∨-isIdempotentCommutativeMonoid = record
+  { isCommutativeMonoid = ∨-isCommutativeMonoid
+  ; idem                = ∨-idem
+  }
+
+∨-∙-isNearSemiring : IsNearSemiring (_≈_ {n}) _∨_ _∙_ ⊥
+∨-∙-isNearSemiring {a} = record
+  { +-isMonoid    = ∨-isMonoid
+  ; *-isSemigroup = ∙-isSemigroup {a}
+  ; distribʳ      = ∙-distribʳ-∨
+  ; zeroˡ         = ∙-zeroˡ
+  }
+
+∨-∙-isSemiringWithoutOne : IsSemiringWithoutOne (_≈_ {n}) _∨_ _∙_ ⊥
+∨-∙-isSemiringWithoutOne {a} = record
+  { +-isCommutativeMonoid = ∨-isCommutativeMonoid
+  ; *-isSemigroup         = ∙-isSemigroup {a}
+  ; distrib               = ∙-distrib-∨
+  ; zero                  = ∙-zero
+  }
+
+∨-∙-isSemiringWithoutAnnihilatingZero : IsSemiringWithoutAnnihilatingZero (_≈_ {n}) _∨_ _∙_ ⊥ ε
+∨-∙-isSemiringWithoutAnnihilatingZero {a} = record
+  { +-isCommutativeMonoid = ∨-isCommutativeMonoid
+  ; *-isMonoid            = ∙-isMonoid {a}
+  ; distrib               = ∙-distrib-∨
+  }
+
+∨-∙-isSemiring : IsSemiring (_≈_ {n}) _∨_ _∙_ ⊥ ε
+∨-∙-isSemiring {a} = record
+  { isSemiringWithoutAnnihilatingZero = ∨-∙-isSemiringWithoutAnnihilatingZero {a}
+  ; zero                              = ∙-zero
+  }
+
+-- Bundles
+
+∨-magma : ∀ {n : ℕ} → Magma _ _
+∨-magma {n} = record { isMagma = ∨-isMagma {n} }
+
+∨-commutativeMagma : ∀ {n : ℕ} → CommutativeMagma _ _
+∨-commutativeMagma {n} = record { isCommutativeMagma = ∨-isCommutativeMagma {n} }
+
+∨-semigroup : ∀ {n : ℕ} → Semigroup _ _
+∨-semigroup {n} = record { isSemigroup = ∨-isSemigroup {n} }
+
+∨-band : ∀ {n : ℕ} → Band _ _
+∨-band {n} = record { isBand = ∨-isBand {n} }
+
+∨-commutativeSemigroup : ∀ {n : ℕ} → CommutativeSemigroup _ _
+∨-commutativeSemigroup {n} = record { isCommutativeSemigroup = ∨-isCommutativeSemigroup {n} }
+
+∨-semilattice : ∀ {n : ℕ} → Semilattice _ _
+∨-semilattice {n} = record { isSemilattice = ∨-isSemilattice {n} }
+
+∨-monoid : ∀ {n : ℕ} → Monoid _ _
+∨-monoid {n} = record { isMonoid = ∨-isMonoid {n} }
+
+∨-commutativeMonoid : ∀ {n : ℕ} → CommutativeMonoid _ _
+∨-commutativeMonoid {n} = record { isCommutativeMonoid = ∨-isCommutativeMonoid {n} }
+
+∨-idempotentCommutativeMonoid : ∀ {n : ℕ} → IdempotentCommutativeMonoid _ _
+∨-idempotentCommutativeMonoid {n} = record
+  { isIdempotentCommutativeMonoid = ∨-isIdempotentCommutativeMonoid {n} }
+
+∨-∙-nearSemiring : ∀ {n : ℕ} → NearSemiring _ _
+∨-∙-nearSemiring {n} = record { isNearSemiring = ∨-∙-isNearSemiring {n} }
+
+∨-∙-semiringWithoutOne : ∀ {n : ℕ} → SemiringWithoutOne _ _
+∨-∙-semiringWithoutOne {n} = record { isSemiringWithoutOne = ∨-∙-isSemiringWithoutOne {n} }
+
+∨-∙-semiringWithoutAnnihilatingZero : ∀ {n : ℕ} → SemiringWithoutAnnihilatingZero _ _
+∨-∙-semiringWithoutAnnihilatingZero {n} = record { isSemiringWithoutAnnihilatingZero = ∨-∙-isSemiringWithoutAnnihilatingZero {n} }
+
+∨-∙-semiring : ∀ {n : ℕ} → Semiring _ _
+∨-∙-semiring {n} = record { isSemiring = ∨-∙-isSemiring {n} }
+
+------------------------------------------------------------------------
+-- Properties of ⋃_
+------------------------------------------------------------------------
+-- Functional properties
+
+μ-cong : μ_ Preserves _≈_ ⟶ (_≈_ {n})
+μ-cong {x = e} {e′} e≈e′ γ = ⋃-cong λ {A} {B} A≈B → begin
+  ⟦ e ⟧ (A ∷ γ) ≈⟨ ⟦⟧-cong-env e (A≈B ∷ PW.refl ≈ˡ-refl) ⟩
+  ⟦ e ⟧ (B ∷ γ) ≈⟨ e≈e′ (B ∷ γ) ⟩
+  ⟦ e′ ⟧ (B ∷ γ) ∎
+  where
+  open import Relation.Binary.Reasoning.Setoid setoidˡ
+
+------------------------------------------------------------------------
+-- Properties of wkn
+------------------------------------------------------------------------
+-- Algebraic properties
+
+wkn-cong : ∀ (e : Expression n) i γ A → ⟦ wkn e i ⟧ (insert γ i A) ≈ˡ ⟦ e ⟧ γ
+wkn-cong ⊥         i γ A = ≈ˡ-refl
+wkn-cong ε         i γ A = ≈ˡ-refl
+wkn-cong (Char _)  i γ A = ≈ˡ-refl
+wkn-cong (e₁ ∨ e₂) i γ A = ∪-cong (wkn-cong e₁ i γ A) (wkn-cong e₂ i γ A)
+wkn-cong (e₁ ∙ e₂) i γ A = ∙ˡ-cong (wkn-cong e₁ i γ A) (wkn-cong e₂ i γ A)
+wkn-cong (Var j)   i γ A = ≈ˡ-reflexive (insert-punchIn γ i A j)
+wkn-cong (μ e)     i γ A = ⋃-cong λ {B} {C} B≈C → begin
+  ⟦ wkn e (suc i) ⟧ (B ∷ insert γ i A) ≈⟨ ⟦⟧-cong-env (wkn e (suc i)) (B≈C ∷ PW.refl ≈ˡ-refl) ⟩
+  ⟦ wkn e (suc i) ⟧ (C ∷ insert γ i A) ≈⟨ wkn-cong e (suc i) (C ∷ γ) A ⟩
+  ⟦ e ⟧ (C ∷ γ)                        ∎
+  where
+  open import Relation.Binary.Reasoning.Setoid setoidˡ
+
+-- Syntactic properties
+
+rank-wkn : ∀ (e : Expression n) i → rank (wkn e i) ≡ rank e
+rank-wkn ⊥         i = refl
+rank-wkn ε         i = refl
+rank-wkn (Char _)  i = refl
+rank-wkn (e₁ ∨ e₂) i = cong₂ (λ x y → suc (x + y)) (rank-wkn e₁ i) (rank-wkn e₂ i)
+rank-wkn (e₁ ∙ _) i  = cong suc (rank-wkn e₁ i)
+rank-wkn (Var _)   i = refl
+rank-wkn (μ e)     i = cong suc (rank-wkn e (suc i))
+
+------------------------------------------------------------------------
+-- Other properties of wkn
+
+μ-wkn : ∀ (e : Expression n) → μ (wkn e zero) ≈ e
+μ-wkn e γ = ≈ˡ-trans
+  (∀[Fⁿ≈Gⁿ]⇒⋃F≈⋃G λ
+    { 0       → ≈ˡ-refl
+    ; (suc n) → wkn-cong e zero γ (((λ X → ⟦ wkn e zero ⟧ (X ∷ γ)) ^ n) ∅)
     })
-  }
-  where
-  module ∪-comm = IsCommutativeMonoid (∪.isCommutativeMonoid {c ⊔ ℓ})
+  (⋃-inverseʳ (⟦ e ⟧ γ))
 
-module _ where
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE
-  open import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
+------------------------------------------------------------------------
+-- Properties of subst
+------------------------------------------------------------------------
+-- Algebraic properties
 
-  cong-env : ∀ {n} → (e : Expression n) → ∀ {γ γ′} → γ VE.≋ γ′ → ⟦ e ⟧ γ ≈ ⟦ e ⟧ γ′
-  cong-env ⊥ γ≈γ′ = ≈-refl
-  cong-env ε γ≈γ′ = ≈-refl
-  cong-env (Char x) γ≈γ′ = ≈-refl
-  cong-env (e₁ ∨ e₂) γ≈γ′ = ∪-cong (cong-env e₁ γ≈γ′) (cong-env e₂ γ≈γ′)
-    where
-    open IsCommutativeMonoid (∪.isCommutativeMonoid {c ⊔ ℓ}) renaming (∙-cong to ∪-cong)
-  cong-env (e₁ ∙ e₂) γ≈γ′ = ∙-cong (cong-env e₁ γ≈γ′) (cong-env e₂ γ≈γ′)
-    where
-    open IsMonoid (∙.isMonoid {c ⊔ ℓ})
-  cong-env (Var j) γ≈γ′ = PW.lookup γ≈γ′ j
-  cong-env (μ e) γ≈γ′ = ⋃.⋃-cong (λ x → cong-env e (x PW.∷ γ≈γ′))
+subst-cong : ∀ (e : Expression (suc n)) e′ i γ → ⟦ e [ e′ / i ] ⟧ γ ≈ˡ ⟦ e ⟧ (insert γ i (⟦ e′ ⟧ γ))
+subst-cong ⊥         e′ i γ = ≈ˡ-refl
+subst-cong ε         e′ i γ = ≈ˡ-refl
+subst-cong (Char c)  e′ i γ = ≈ˡ-refl
+subst-cong (e₁ ∨ e₂) e′ i γ = ∪-cong (subst-cong e₁ e′ i γ) (subst-cong e₂ e′ i γ)
+subst-cong (e₁ ∙ e₂) e′ i γ = ∙ˡ-cong (subst-cong e₁ e′ i γ) (subst-cong e₂ e′ i γ)
+subst-cong (Var j)   e′ i γ with i ≟ j
+...                            | yes refl = ≈ˡ-reflexive (sym (insert-lookup γ i (⟦ e′ ⟧ γ)))
+...                            | no i≢j   = ≈ˡ-reflexive (begin
+  lookup γ po             ≡˘⟨ cong (λ x → lookup x po) (remove-insert γ i (⟦ e′ ⟧ γ)) ⟩
+  lookup (remove γ′ i) po ≡⟨ remove-punchOut γ′ i≢j ⟩
+  lookup γ′ j             ∎)
+  where
+  open ≡-Reasoning
+  po = punchOut i≢j
+  γ′ = insert γ i (⟦ e′ ⟧ γ)
+subst-cong (μ e)     e′ i γ = ⋃-cong λ {A} {B} A≈B → begin
+  ⟦ e [ e′′ / suc i ] ⟧ (A ∷ γ)            ≈⟨ ⟦⟧-cong-env (e [ e′′ / suc i ]) (A≈B ∷ PW.refl ≈ˡ-refl) ⟩
+  ⟦ e [ e′′ / suc i ] ⟧ (B ∷ γ)            ≈⟨ subst-cong e e′′ (suc i) (B ∷ γ) ⟩
+  ⟦ e ⟧ (B ∷ insert γ i (⟦ e′′ ⟧ (B ∷ γ))) ≈⟨ ⟦⟧-cong-env e (insert′ (wkn-cong e′ zero γ B) (B ∷ γ) (suc i)) ⟩
+  ⟦ e ⟧ (B ∷ insert γ i (⟦ e′ ⟧ γ))        ∎
+  where
+  open import Relation.Binary.Reasoning.Setoid setoidˡ
+  e′′ = wkn e′ zero
 
-wkn-no-use : ∀ {n} → (e : Expression n) → ∀ i γ → ⟦ wkn e i ⟧ γ ≈ ⟦ e ⟧ (remove γ i)
-wkn-no-use ⊥ i γ = ≈-refl
-wkn-no-use ε i γ = ≈-refl
-wkn-no-use (Char x) i γ = ≈-refl
-wkn-no-use (e₁ ∨ e₂) i γ = ∪-cong (wkn-no-use e₁ i γ) (wkn-no-use e₂ i γ)
-  where
-  open IsCommutativeMonoid (∪.isCommutativeMonoid {c ⊔ ℓ}) renaming (∙-cong to ∪-cong)
-wkn-no-use (e₁ ∙ e₂) i γ = ∙-cong (wkn-no-use e₁ i γ) (wkn-no-use e₂ i γ)
-  where
-  open IsMonoid (∙.isMonoid {c ⊔ ℓ})
-wkn-no-use (Var j) i γ = reflexive (begin
-  lookup γ (punchIn i j)                                    ≡˘⟨ ≡.cong (λ x → lookup x (punchIn i j)) (insert-remove γ i) ⟩
-  lookup (insert (remove γ i) i (lookup γ i)) (punchIn i j) ≡⟨ insert-punchIn (remove γ i) i (lookup γ i) j ⟩
-  lookup (remove γ i) j                                     ∎)
-  where
-  open IsEquivalence (≈-isEquivalence {c ⊔ ℓ})
-  open ≡.≡-Reasoning
-wkn-no-use (μ e) i (z ∷ γ) = ⋃.⋃-cong (λ {x} {y} x≈y → begin
-  ⟦ wkn e (suc i) ⟧ (x ∷ z ∷ γ)      ≈⟨ cong-env (wkn e (suc i)) (x≈y ∷ ≋-refl) ⟩
-  ⟦ wkn e (suc i) ⟧ (y ∷ z ∷ γ)      ≈⟨ wkn-no-use e (suc i) (y ∷ z ∷ γ) ⟩
-  ⟦ e ⟧ (remove (y ∷ z ∷ γ) (suc i)) ≡⟨⟩
-  ⟦ e ⟧ (y ∷ remove (z ∷ γ) i)       ∎)
-  where
-  open import Relation.Binary.Reasoning.Setoid (L.setoid (c ⊔ ℓ))
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE
-
-subst-fun : ∀ {n} → (e : Expression (suc n)) → ∀ e′ i γ → ⟦ e [ e′ / i ] ⟧ γ ≈ ⟦ e ⟧ (insert γ i (⟦ e′ ⟧ γ))
-subst-fun ⊥ e′ i γ = ≈-refl
-subst-fun ε e′ i γ = ≈-refl
-subst-fun (Char x) e′ i γ = ≈-refl
-subst-fun {n} (e₁ ∨ e₂) e′ i γ = ∪-cong (subst-fun e₁ e′ i γ) (subst-fun e₂ e′ i γ)
-  where
-  open IsCommutativeMonoid (∪.isCommutativeMonoid {c ⊔ ℓ}) renaming (∙-cong to ∪-cong)
-subst-fun (e₁ ∙ e₂) e′ i γ = ∙-cong (subst-fun e₁ e′ i γ) (subst-fun e₂ e′ i γ)
-  where
-  open IsMonoid (∙.isMonoid {c ⊔ ℓ})
-subst-fun (Var j) e′ i γ with i F.≟ j
-... | yes _≡_.refl = sym (reflexive (insert-lookup γ i (⟦ e′ ⟧ γ)))
-  where
-  open IsEquivalence (≈-isEquivalence {c ⊔ ℓ})
-... | no i≢j = reflexive (begin
-                 lookup γ (punchOut i≢j) ≡˘⟨ ≡.cong (λ x → lookup x (punchOut i≢j)) (remove-insert γ i (⟦ e′ ⟧ γ)) ⟩
-                 lookup (remove (insert γ i (⟦ e′ ⟧ γ)) i) (punchOut i≢j) ≡⟨ remove-punchOut (insert γ i (⟦ e′ ⟧ γ)) i≢j ⟩
-                 lookup (insert γ i (⟦ e′ ⟧ γ)) j ∎)
-  where
-  open ≡.≡-Reasoning
-  open IsEquivalence (≈-isEquivalence {c ⊔ ℓ})
-subst-fun (μ e) e′ i γ = ⋃.⋃-cong λ {x} {y} x≈y → begin
-  ⟦ e [ wkn e′ F.zero / suc i ] ⟧ (x ∷ γ) ≈⟨ cong-env (e [ wkn e′ F.zero / suc i ]) (x≈y ∷ ≋-refl) ⟩
-  ⟦ e [ wkn e′ F.zero / suc i ] ⟧ (y ∷ γ) ≈⟨ subst-fun e (wkn e′ F.zero) (suc i) (y ∷ γ) ⟩
-  ⟦ e ⟧ (y ∷ insert γ i (⟦ wkn e′ F.zero ⟧ (y ∷ γ))) ≈⟨ cong-env e (≈-refl ∷ insert′ (wkn-no-use e′ F.zero (y ∷ γ)) ≋-refl i) ⟩
-  ⟦ e ⟧ (y ∷ insert γ i (⟦ e′ ⟧ γ)) ∎
-  where
-  open import Relation.Binary.Reasoning.Setoid (L.setoid (c ⊔ ℓ))
-  open import Data.Vec.Relation.Binary.Equality.Setoid (L.setoid (c ⊔ ℓ)) as VE
-
-  insert′ : ∀ {n x y} {xs ys : Vec (Language (c ⊔ ℓ)) n} → x ≈ y → xs VE.≋ ys → (i : Fin (suc n)) → insert xs i x VE.≋ insert ys i y
-  insert′ x≈y xs≋ys F.zero = x≈y ∷ xs≋ys
-  insert′ x≈y (z≈w ∷ xs≋ys) (suc i) = z≈w ∷ insert′ x≈y xs≋ys i
-
-mono : ∀ {n} (e : Expression n) → ⟦ e ⟧ Preserves PW.Pointwise L._≤_ ⟶ L._≤_
-mono ⊥ γ≤γ′ = L.≤-refl
-mono ε γ≤γ′ = L.≤-refl
-mono (Char x) γ≤γ′ = L.≤-refl
-mono (e₁ ∨ e₂) γ≤γ′ = ∪.∪-mono (mono e₁ γ≤γ′) (mono e₂ γ≤γ′)
-mono (e₁ ∙ e₂) γ≤γ′ = ∙.∙-mono (mono e₁ γ≤γ′) (mono e₂ γ≤γ′)
-mono (Var i) γ≤γ′ = PW.lookup γ≤γ′ i
-mono (μ e) γ≤γ′ = ⋃.⋃-mono (λ x≤y → mono e (x≤y PW.∷ γ≤γ′))
-
-cast-inverse : ∀ {m n} e → .(m≡n : m ≡ n) → .(n≡m : n ≡ m) → E.cast m≡n (E.cast n≡m e) ≡ e
-cast-inverse ⊥ m≡n n≡m = ≡.refl
-cast-inverse ε m≡n n≡m = ≡.refl
-cast-inverse (Char x) m≡n n≡m = ≡.refl
-cast-inverse (e₁ ∨ e₂) m≡n n≡m = ≡.cong₂ _∨_ (cast-inverse e₁ m≡n n≡m) (cast-inverse e₂ m≡n n≡m)
-cast-inverse (e₁ ∙ e₂) m≡n n≡m = ≡.cong₂ _∙_ (cast-inverse e₁ m≡n n≡m) (cast-inverse e₂ m≡n n≡m)
-cast-inverse (Var x) m≡n n≡m = ≡.cong Var (toℕ-injective (begin
-  toℕ (F.cast m≡n (F.cast n≡m x)) ≡⟨ toℕ-cast m≡n (F.cast n≡m x) ⟩
-  toℕ (F.cast n≡m x)              ≡⟨ toℕ-cast n≡m x ⟩
-  toℕ x                           ∎))
-  where
-  open ≡.≡-Reasoning
-cast-inverse (μ e) m≡n n≡m = ≡.cong μ (cast-inverse e (≡.cong suc m≡n) (≡.cong suc n≡m))
-
-cast-involutive : ∀ {k m n} e → .(k≡m : k ≡ m) → .(m≡n : m ≡ n) → .(k≡n : k ≡ n) → E.cast m≡n (E.cast k≡m e) ≡ E.cast k≡n e
-cast-involutive ⊥ k≡m m≡n k≡n = ≡.refl
-cast-involutive ε k≡m m≡n k≡n = ≡.refl
-cast-involutive (Char x) k≡m m≡n k≡n = ≡.refl
-cast-involutive (e₁ ∨ e₂) k≡m m≡n k≡n = ≡.cong₂ _∨_ (cast-involutive e₁ k≡m m≡n k≡n) (cast-involutive e₂ k≡m m≡n k≡n)
-cast-involutive (e₁ ∙ e₂) k≡m m≡n k≡n = ≡.cong₂ _∙_ (cast-involutive e₁ k≡m m≡n k≡n) (cast-involutive e₂ k≡m m≡n k≡n)
-cast-involutive (Var x) k≡m m≡n k≡n = ≡.cong Var (toℕ-injective (begin
-  toℕ (F.cast m≡n (F.cast k≡m x)) ≡⟨ toℕ-cast m≡n (F.cast k≡m x) ⟩
-  toℕ (F.cast k≡m x)              ≡⟨ toℕ-cast k≡m x ⟩
-  toℕ x                           ≡˘⟨ toℕ-cast k≡n x ⟩
-  toℕ (F.cast k≡n x)              ∎))
-  where
-  open ≡.≡-Reasoning
-cast-involutive (μ e) k≡m m≡n k≡n = ≡.cong μ (cast-involutive e (≡.cong suc k≡m) (≡.cong suc m≡n) (≡.cong suc k≡n))
-
-<ᵣₐₙₖ-wellFounded : ∀ {n} → WellFounded (_<ᵣₐₙₖ_ {n})
-<ᵣₐₙₖ-wellFounded = On.wellFounded rank <-wellFounded
-
-e₁<ᵣₐₙₖe₁∨e₂ : ∀ {n} → (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∨ e₂
-e₁<ᵣₐₙₖe₁∨e₂ e₁ e₂ = begin-strict
-  rank e₁                   ≤⟨ m≤m+n (rank e₁) (rank e₂) ⟩
-  rank e₁ ℕ.+ rank e₂       <⟨ n<1+n (rank e₁ ℕ.+ rank e₂) ⟩
-  suc (rank e₁ ℕ.+ rank e₂) ≡⟨⟩
-  rank (e₁ ∨ e₂)            ∎
-  where
-  open ≤-Reasoning
-
-e₂<ᵣₐₙₖe₁∨e₂ : ∀ {n} → (e₁ e₂ : Expression n) → e₂ <ᵣₐₙₖ e₁ ∨ e₂
-e₂<ᵣₐₙₖe₁∨e₂ e₁ e₂ = begin-strict
-  rank e₂                   ≤⟨ m≤n+m (rank e₂) (rank e₁) ⟩
-  rank e₁ ℕ.+ rank e₂       <⟨ n<1+n (rank e₁ ℕ.+ rank e₂) ⟩
-  suc (rank e₁ ℕ.+ rank e₂) ≡⟨⟩
-  rank (e₁ ∨ e₂)            ∎
-  where
-  open ≤-Reasoning
+  insert′ :
+    ∀ {n} {x y : Language (c ⊔ ℓ)} (x≈y : x ≈ˡ y) xs i →
+    Pointwise _≈ˡ_ {n = suc n} (insert xs i x) (insert xs i y)
+  insert′ x≈y xs        zero   = x≈y ∷ PW.refl ≈ˡ-refl
+  insert′ x≈y (x ∷ xs) (suc i) = ≈ˡ-refl ∷ insert′ x≈y xs i
