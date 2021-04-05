@@ -6,7 +6,14 @@ module Cfe.Language.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open Setoid over using () renaming (Carrier to C; _≈_ to _∼_; refl to ∼-refl)
+open Setoid over using ()
+  renaming
+    ( Carrier to C
+    ; _≈_ to _∼_
+    ; refl to ∼-refl
+    ; sym to ∼-sym
+    ; trans to ∼-trans
+    )
 
 open import Algebra
 open import Cfe.Function.Power
@@ -266,6 +273,19 @@ xyw∉｛c｝ : ∀ c x y w → x ∷ y ∷ w ∉ ｛ c ｝
 xyw∉｛c｝ c x y w (_ ∷ ())
 
 ------------------------------------------------------------------------
+-- Algebraic properties of ｛_｝
+
+｛｝-cong : ∀ {c c′} → c ∼ c′ → ｛ c ｝ ≈ ｛ c′ ｝
+｛｝-cong c∼c′ =
+  ⊆-antisym
+    (sub λ { (c∼x ∷ []) → c∼c′⇒c′∈｛c｝ (∼-trans (∼-sym c∼c′) c∼x) })
+    (sub λ { (c′∼x ∷ []) → c∼c′⇒c′∈｛c｝ (∼-trans c∼c′ c′∼x) })
+
+｛｝-inj : ∀ {c c′} → ｛ c ｝ ≈ ｛ c′ ｝ → c ∼ c′
+｛｝-inj {c} c≈c′ with ∈-resp-≈ c≈c′ (∼-refl ∷ [])
+...                  | (c′∼c ∷ []) = ∼-sym c′∼c
+
+------------------------------------------------------------------------
 -- Properties of _∙_
 ------------------------------------------------------------------------
 -- Membership properties of _∙_
@@ -408,14 +428,14 @@ c∈Flast[B]+w∈A⇒c∈Flast[A∙B] {c = c} (x , w , xw∈B , w′ , xwcw′�
 
 -- Bundles
 
-∙-Magma : ∀ {a} → Magma (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
-∙-Magma {a} = record { isMagma = ∙-isMagma {a} }
+∙-magma : ∀ {a} → Magma (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∙-magma {a} = record { isMagma = ∙-isMagma {a} }
 
-∙-Semigroup : ∀ {a} → Semigroup (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
-∙-Semigroup {a} = record { isSemigroup = ∙-isSemigroup {a} }
+∙-semigroup : ∀ {a} → Semigroup (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∙-semigroup {a} = record { isSemigroup = ∙-isSemigroup {a} }
 
-∙-Monoid : ∀ {a} → Monoid (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
-∙-Monoid {a} = record { isMonoid = ∙-isMonoid {a} }
+∙-monoid : ∀ {a} → Monoid (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∙-monoid {a} = record { isMonoid = ∙-isMonoid {a} }
 
 ------------------------------------------------------------------------
 -- Other properties of _∙_

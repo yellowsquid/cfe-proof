@@ -66,9 +66,9 @@ w ∉ A = ¬ w ∈ A
 ------------------------------------------------------------------------
 -- Language Combinators
 
+infix 8 ⋃_
 infix 7 _∙_
 infix 6 _∪_
-infix 5 ⋃_
 
 _∙_ : Language a → Language b → Language _
 A ∙ B = record
