@@ -6,7 +6,7 @@ module Cfe.Expression.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open Setoid over using () renaming (_≈_ to _∼_)
+open Setoid over using () renaming (Carrier to C; _≈_ to _∼_)
 
 open import Algebra
 open import Cfe.Expression.Base over
@@ -34,17 +34,21 @@ open import Cfe.Language over
   ; ∙-zero to ∙ˡ-zero
   )
 open import Data.Empty using (⊥-elim)
-open import Data.Fin hiding (_+_)
+open import Data.Fin hiding (_+_; _≤_; _<_)
+open import Data.List using (List; length; _++_)
+open import Data.List.Properties using (length-++)
+open import Data.List.Relation.Binary.Pointwise using (Pointwise-length)
 open import Data.Nat hiding (_≟_; _⊔_; _^_)
 open import Data.Nat.Properties hiding (_≟_)
-open import Data.Product using (_,_)
-open import Data.Vec
+open import Data.Product
+open import Data.Sum using (_⊎_; inj₁; inj₂)
+open import Data.Vec hiding (length; _++_)
 open import Data.Vec.Properties
 open import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
-  hiding (refl; sym; setoid; lookup)
+  hiding (refl; sym; trans; setoid; lookup)
 open import Level using (_⊔_)
 open import Relation.Binary.PropositionalEquality hiding (setoid)
-open import Relation.Nullary using (yes; no)
+open import Relation.Nullary
 
 private
   variable
@@ -116,6 +120,14 @@ setoid {n} = record { isEquivalence = ≈-isEquivalence {n} }
 ------------------------------------------------------------------------
 -- Properties of _<ᵣₐₙₖ_
 ------------------------------------------------------------------------
+-- Definitions
+
+infix 4 _<ₗₑₓ_
+
+_<ₗₑₓ_ : REL (List C × Expression m) (List C × Expression n) _
+(w , e) <ₗₑₓ (w′ , e′) = length w < length w′ ⊎ length w ≡ length w′ × e <ᵣₐₙₖ e′
+
+------------------------------------------------------------------------
 -- Relational properties
 
 <ᵣₐₙₖ-trans : Trans (_<ᵣₐₙₖ_ {k}) (_<ᵣₐₙₖ_ {m} {n}) _<ᵣₐₙₖ_
@@ -123,6 +135,22 @@ setoid {n} = record { isEquivalence = ≈-isEquivalence {n} }
 
 <ᵣₐₙₖ-asym : Asymmetric (_<ᵣₐₙₖ_ {n})
 <ᵣₐₙₖ-asym = <-asym
+
+<ₗₑₓ-trans : Trans (_<ₗₑₓ_ {k}) (_<ₗₑₓ_ {m} {n}) _<ₗₑₓ_
+<ₗₑₓ-trans (inj₁ ∣w₁∣<∣w₂∣)           (inj₁ ∣w₂∣<∣w₃∣)           =
+  inj₁ (<-trans ∣w₁∣<∣w₂∣ ∣w₂∣<∣w₃∣)
+<ₗₑₓ-trans (inj₁ ∣w₁∣<∣w₂∣)           (inj₂ (∣w₂∣≡∣w₃∣ , _))     =
+  inj₁ (<-transˡ ∣w₁∣<∣w₂∣ (≤-reflexive ∣w₂∣≡∣w₃∣))
+<ₗₑₓ-trans (inj₂ (∣w₁∣≡∣w₂∣ , _))     (inj₁ ∣w₂∣<∣w₃∣)           =
+  inj₁ (<-transʳ (≤-reflexive ∣w₁∣≡∣w₂∣) ∣w₂∣<∣w₃∣)
+<ₗₑₓ-trans (inj₂ (∣w₁∣≡∣w₂∣ , r₁<r₂)) (inj₂ (∣w₂∣≡∣w₃∣ , r₂<r₃)) =
+  inj₂ (trans ∣w₁∣≡∣w₂∣ ∣w₂∣≡∣w₃∣ , <ᵣₐₙₖ-trans r₁<r₂ r₂<r₃)
+
+<ₗₑₓ-asym : Asymmetric (_<ₗₑₓ_ {n})
+<ₗₑₓ-asym (inj₁ ∣w₁∣<∣w₂∣)       (inj₁ ∣w₂∣<∣w₁|)       = <-asym ∣w₁∣<∣w₂∣ ∣w₂∣<∣w₁|
+<ₗₑₓ-asym (inj₁ ∣w₁∣<∣w₂∣)       (inj₂ (∣w₂∣≡∣w₁∣ , _)) = <-irrefl (sym ∣w₂∣≡∣w₁∣) ∣w₁∣<∣w₂∣
+<ₗₑₓ-asym (inj₂ (∣w₁∣≡∣w₂∣ , _)) (inj₁ ∣w₂∣<∣w₁|)       = <-irrefl (sym ∣w₁∣≡∣w₂∣) ∣w₂∣<∣w₁|
+<ₗₑₓ-asym (inj₂ (_ , r₁<r₂))      (inj₂ (_ , r₂<r₁))    = <ᵣₐₙₖ-asym r₁<r₂ r₂<r₁
 
 ------------------------------------------------------------------------
 -- Other properties
@@ -145,6 +173,33 @@ rank-∨ʳ e₁ e₂ = begin-strict
 
 rank-∙ˡ : ∀ (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∙ e₂
 rank-∙ˡ e₁ _ = n<1+n (rank e₁)
+
+lex-∙ʳ :
+  ∀ (e₁ e₂ : Expression n) γ → ¬ Null (⟦ e₁ ⟧ γ) →
+  ∀ {w} → (w∈⟦e₁∙e₂⟧ : w ∈ ⟦ e₁ ∙ e₂ ⟧ γ) →
+  let w₂ = proj₁ (proj₂ w∈⟦e₁∙e₂⟧) in
+  (w₂ , e₂) <ₗₑₓ (w , e₁ ∙ e₂)
+lex-∙ʳ e₁ _ γ ε∉⟦e₁⟧ {w} (w₁ , w₂ , w₁∈⟦e₁⟧ , w₂∈⟦e₂⟧ , eq) with m≤n⇒m<n∨m≡n ∣w₂∣≤∣w∣
+  where
+  ∣w₂∣≤∣w∣ : length w₂ ≤ length w
+  ∣w₂∣≤∣w∣ = begin
+    length w₂             ≤⟨ m≤n+m (length w₂) (length w₁) ⟩
+    length w₁ + length w₂ ≡˘⟨ length-++ w₁ ⟩
+    length (w₁ ++ w₂)     ≡⟨ Pointwise-length eq ⟩
+    length w              ∎
+    where
+    open ≤-Reasoning
+... | inj₁ ∣w₂∣<∣w∣ = inj₁ ∣w₂∣<∣w∣
+... | inj₂ ∣w₂∣≡∣w∣ = ⊥-elim (ε∉⟦e₁⟧ (∣w∣≡0+w∈A⇒ε∈A {A = ⟦ e₁ ⟧ γ} ∣w₁∣≡0 w₁∈⟦e₁⟧))
+  where
+    ∣w₁∣≡0 : length w₁ ≡ 0
+    ∣w₁∣≡0 = +-cancelʳ-≡ (length w₁) 0 (begin-equality
+      length w₁ + length w₂ ≡˘⟨ length-++ w₁ ⟩
+      length (w₁ ++ w₂)     ≡⟨ Pointwise-length eq ⟩
+      length w              ≡˘⟨ ∣w₂∣≡∣w∣ ⟩
+      length w₂             ∎)
+      where
+      open ≤-Reasoning
 
 rank-μ : ∀ (e : Expression (suc n)) → e <ᵣₐₙₖ μ e
 rank-μ e = n<1+n (rank e)
