@@ -109,6 +109,7 @@ private
   ; trans = λ {e} {e′} {e′′} → ≈-trans {n} {e} {e′} {e′′}
   }
 
+------------------------------------------------------------------------
 -- Bundles
 
 partialSetoid : ∀ {n} → PartialSetoid _ _

@@ -1,6 +1,6 @@
 {-# OPTIONS --without-K --safe #-}
 
-open import Relation.Binary using (_Respects_; Setoid)
+open import Relation.Binary using (REL; _Respects_; Setoid)
 
 module Cfe.Type.Base
   {c ℓ} (over : Setoid c ℓ)
@@ -13,7 +13,7 @@ open import Data.Bool renaming (_∨_ to _∨ᵇ_; _≤_ to _≤ᵇ_)
 open import Data.Empty.Polymorphic using (⊥)
 open import Data.Product using (_×_)
 open import Data.Sum using (_⊎_; map)
-open import Function using (const; flip)
+open import Function
 open import Level
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (¬_)
@@ -22,22 +22,14 @@ private
   variable
     a b fℓ lℓ fℓ₁ lℓ₁ fℓ₂ lℓ₂ : Level
 
-  union : (C → Set a) → (C → Set b) → C → Set _
-  union A B c = A c ⊎ B c
-
-  union-cong :
-    ∀ {A : C → Set a} {B : C → Set b} →
-    A Respects _∼_ → B Respects _∼_ → union A B Respects _∼_
-  union-cong A-cong B-cong x∼y = map (A-cong x∼y) (B-cong x∼y)
-
-  if-cong :
-    ∀ {A B : C → Set a} cond →
-    A Respects _∼_ → B Respects _∼_ → (if cond then A else B) Respects _∼_
-  if-cong false A-cong B-cong = B-cong
-  if-cong true  A-cong B-cong = A-cong
-
 ------------------------------------------------------------------------
 -- Definitions
+
+infix 2 _⇒_
+
+_⇒_ : Bool → (C → Set a) → C → Set a
+false ⇒ A = const ⊥
+true  ⇒ A = A
 
 record Type fℓ lℓ : Set (c ⊔ ℓ ⊔ suc (fℓ ⊔ lℓ)) where
   field
@@ -86,11 +78,28 @@ infix 6 _∨_
 _∙_ : Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ₂) (lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂)
 τ₁ ∙ τ₂ = record
   { null       = τ₁.null ∧ τ₂.null
-  ; first      = union τ₁.first (if τ₁.null then τ₂.first else const ⊥)
-  ; flast      = union τ₂.flast (if τ₂.null then union τ₂.first τ₁.flast else const ⊥)
-  ; first-cong = union-cong τ₁.first-cong (if-cong τ₁.null τ₂.first-cong (λ _ ()))
-  ; flast-cong =
-      union-cong τ₂.flast-cong (if-cong τ₂.null (union-cong τ₂.first-cong τ₁.flast-cong) (λ _ ()))
+  ; first      = λ c → τ₁.first c ⊎ (τ₁.null ⇒ τ₂.first) c
+  ; flast      = λ c → τ₂.flast c ⊎ (τ₂.null ⇒ λ c → τ₂.first c ⊎ τ₁.flast c) c
+  ; first-cong = λ {c} {c′} c∼c′ →
+      map
+        (τ₁.first-cong c∼c′)
+        (case τ₁.null
+         return (λ b → (b ⇒ τ₂.first) c → (b ⇒ τ₂.first) c′)
+         of λ
+           { true  → τ₂.first-cong c∼c′
+           ; false → id
+           })
+  ; flast-cong = λ {c} {c′} c∼c′ →
+      map
+        (τ₂.flast-cong c∼c′)
+        (case τ₂.null
+         return (λ b →
+           (b ⇒ λ c → τ₂.first c ⊎ τ₁.flast c) c →
+           (b ⇒ λ c → τ₂.first c ⊎ τ₁.flast c) c′)
+         of λ
+           { true  → map (τ₂.first-cong c∼c′) (τ₁.flast-cong c∼c′)
+           ; false → id
+           })
   }
   where
   module τ₁ = Type τ₁
@@ -99,10 +108,10 @@ _∙_ : Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ
 _∨_ : Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ₂) (lℓ₁ ⊔ lℓ₂)
 τ₁ ∨ τ₂ = record
   { null       = τ₁.null ∨ᵇ τ₂.null
-  ; first      = union τ₁.first τ₂.first
-  ; flast      = union τ₁.flast τ₂.flast
-  ; first-cong = union-cong τ₁.first-cong τ₂.first-cong
-  ; flast-cong = union-cong τ₁.flast-cong τ₂.flast-cong
+  ; first      = λ c → τ₁.first c ⊎ τ₂.first c
+  ; flast      = λ c → τ₁.flast c ⊎ τ₂.flast c
+  ; first-cong = λ c∼c′ → map (τ₁.first-cong c∼c′) (τ₂.first-cong c∼c′)
+  ; flast-cong = λ c∼c′ → map (τ₁.flast-cong c∼c′) (τ₂.flast-cong c∼c′)
   }
   where
   module τ₁ = Type τ₁
@@ -111,11 +120,7 @@ _∨_ : Type fℓ₁ lℓ₁ → Type fℓ₂ lℓ₂ → Type (fℓ₁ ⊔ fℓ
 ------------------------------------------------------------------------
 -- Relations
 
-infix 4 _≈_
-infix 4 _≤_
-infix 4 _⊨_
-infix 4 _⊛_
-infix 4 _#_
+infix 4 _≈_ _≤_ _≥_ _⊨_ _⊛_ _#_
 
 record _≈_ (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ fℓ₁ ⊔ lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂) where
   module τ₁ = Type τ₁
@@ -123,9 +128,9 @@ record _≈_ (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set
   field
     n≡n   : τ₁.null ≡ τ₂.null
     f₁⊆f₂ : ∀ {c} → τ₁.first c → τ₂.first c
-    f₁⊇f₂ : ∀ {c} → τ₁.first c → τ₂.first c
+    f₁⊇f₂ : ∀ {c} → τ₂.first c → τ₁.first c
     l₁⊆l₂ : ∀ {c} → τ₁.flast c → τ₂.flast c
-    l₁⊇l₂ : ∀ {c} → τ₁.flast c → τ₂.flast c
+    l₁⊇l₂ : ∀ {c} → τ₂.flast c → τ₁.flast c
 
 record _≤_ (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ fℓ₁ ⊔ lℓ₁ ⊔ fℓ₂ ⊔ lℓ₂) where
   module τ₁ = Type τ₁
@@ -135,6 +140,9 @@ record _≤_ (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set
     f⊆f : ∀ {c} → τ₁.first c → τ₂.first c
     l⊆l : ∀ {c} → τ₁.flast c → τ₂.flast c
 
+_≥_ : REL (Type fℓ₁ lℓ₁) (Type fℓ₂ lℓ₂) _
+_≥_ = flip _≤_
+
 record _⊨_ (A : Language a) (τ : Type fℓ lℓ) : Set (c ⊔ a ⊔ fℓ ⊔ lℓ) where
   module τ = Type τ
   field
@@ -143,15 +151,17 @@ record _⊨_ (A : Language a) (τ : Type fℓ lℓ) : Set (c ⊔ a ⊔ fℓ ⊔ 
     l⇒l : ∀ {c} → Flast A c → τ.flast c
 
 record _⊛_ (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ lℓ₁ ⊔ fℓ₂) where
-  module τ₁ = Type τ₁
-  module τ₂ = Type τ₂
+  private
+    module τ₁ = Type τ₁
+    module τ₂ = Type τ₂
   field
-    ∄[l₁∩f₂] : ∀ c → ¬ (τ₁.flast c × τ₂.first c)
+    ∄[l₁∩f₂] : ∀ {c} → ¬ (τ₁.flast c × τ₂.first c)
     ¬n₁      : ¬ T (τ₁.null)
 
 record _#_ (τ₁ : Type fℓ₁ lℓ₁) (τ₂ : Type fℓ₂ lℓ₂) : Set (c ⊔ fℓ₁ ⊔ fℓ₂) where
-  module τ₁ = Type τ₁
-  module τ₂ = Type τ₂
+  private
+    module τ₁ = Type τ₁
+    module τ₂ = Type τ₂
   field
-    ∄[f₁∩f₂] : ∀ c → ¬ (τ₁.first c × τ₂.first c)
+    ∄[f₁∩f₂] : ∀ {c} → ¬ (τ₁.first c × τ₂.first c)
     ¬n₁∨¬n₂  : ¬ (T τ₁.null × T τ₂.null)

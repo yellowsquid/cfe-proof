@@ -29,7 +29,7 @@ import Data.Nat as ℕ
 open import Data.Product as P
 open import Data.Sum as S
 open import Function hiding (_⟶_)
-open import Level renaming (suc to lsuc)
+open import Level
 import Relation.Binary.Construct.On as On
 open import Relation.Binary.PropositionalEquality hiding (setoid; [_])
 open import Relation.Nullary hiding (Irrelevant)
@@ -52,6 +52,14 @@ private
   w++[]≋w (x ∷ w) = ∼-refl ∷ w++[]≋w w
 
 ------------------------------------------------------------------------
+-- Properties of First
+------------------------------------------------------------------------
+
+First-resp-∼ : ∀ (A : Language a) {c c′} → c ∼ c′ → First A c → First A c′
+First-resp-∼ A c∼c′ (w , cw∈A) = w , ∈-resp-≋ (c∼c′ ∷ ≋-refl) cw∈A
+  where open Language A
+
+------------------------------------------------------------------------
 -- Properties of _⊆_
 ------------------------------------------------------------------------
 -- Relational properties of _⊆_
@@ -71,6 +79,9 @@ private
 ⊆-antisym : Antisym (_⊆_ {a} {b}) _⊆_ _≈_
 ⊆-antisym = _,_
 
+⊆-min : Min (_⊆_ {a} {b}) ∅
+⊆-min _ = sub λ ()
+
 ------------------------------------------------------------------------
 -- Membership properties of _⊆_
 
@@ -83,10 +94,10 @@ private
 Null-resp-⊆ : Null {a} ⟶ Null {b} Respects _⊆_
 Null-resp-⊆ = ∈-resp-⊆
 
-First-resp-⊆ : ∀ {c} → flip (First {a}) c ⟶ flip (First {a}) c Respects _⊆_
+First-resp-⊆ : ∀ {c} → flip (First {a}) c ⟶ flip (First {b}) c Respects _⊆_
 First-resp-⊆ (sub A⊆B) = P.map₂ A⊆B
 
-Flast-resp-⊆ : ∀ {c} → flip (Flast {a}) c ⟶ flip (Flast {a}) c Respects _⊆_
+Flast-resp-⊆ : ∀ {c} → flip (Flast {a}) c ⟶ flip (Flast {b}) c Respects _⊆_
 Flast-resp-⊆ (sub A⊆B) = P.map₂ (P.map₂ (P.map A⊆B (P.map₂ A⊆B)))
 
 ------------------------------------------------------------------------
@@ -108,43 +119,43 @@ Flast-resp-⊆ (sub A⊆B) = P.map₂ (P.map₂ (P.map A⊆B (P.map₂ A⊆B)))
 
 ≈-isPartialEquivalence : IsPartialEquivalence (_≈_ {a})
 ≈-isPartialEquivalence = record
-  { sym = ≈-sym
+  { sym   = ≈-sym
   ; trans = ≈-trans
   }
 
 ≈-isEquivalence : IsEquivalence (_≈_ {a})
 ≈-isEquivalence = record
-  { refl = ≈-refl
-  ; sym = ≈-sym
+  { refl  = ≈-refl
+  ; sym   = ≈-sym
   ; trans = ≈-trans
   }
 
 ⊆-isPreorder : IsPreorder (_≈_ {a}) _⊆_
 ⊆-isPreorder = record
   { isEquivalence = ≈-isEquivalence
-  ; reflexive = ⊆-reflexive
-  ; trans = ⊆-trans
+  ; reflexive     = ⊆-reflexive
+  ; trans         = ⊆-trans
   }
 
 ⊆-isPartialOrder : IsPartialOrder (_≈_ {a}) _⊆_
 ⊆-isPartialOrder = record
   { isPreorder = ⊆-isPreorder
-  ; antisym = ⊆-antisym
+  ; antisym    = ⊆-antisym
   }
 
 ------------------------------------------------------------------------
 -- Bundles
 
-partialSetoid : PartialSetoid (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+partialSetoid : ∀ {a} → PartialSetoid _ _
 partialSetoid {a} = record { isPartialEquivalence = ≈-isPartialEquivalence {a} }
 
-setoid : Setoid (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+setoid : ∀ {a} → Setoid _ _
 setoid {a} = record { isEquivalence = ≈-isEquivalence {a} }
 
-⊆-preorder : Preorder (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+⊆-preorder : ∀ {a} → Preorder _ _ _
 ⊆-preorder {a} = record { isPreorder = ⊆-isPreorder {a} }
 
-⊆-poset : Poset (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+⊆-poset : ∀ {a} → Poset _ _ _
 ⊆-poset {a} = record { isPartialOrder = ⊆-isPartialOrder {a} }
 
 ------------------------------------------------------------------------
@@ -159,10 +170,10 @@ setoid {a} = record { isEquivalence = ≈-isEquivalence {a} }
 Null-resp-≈ : Null {a} ⟶ Null {b} Respects _≈_
 Null-resp-≈ = Null-resp-⊆ ∘ ⊆-reflexive
 
-First-resp-≈ : ∀ {c} → flip (First {a}) c ⟶ flip (First {a}) c Respects _≈_
+First-resp-≈ : ∀ {c} → flip (First {a}) c ⟶ flip (First {b}) c Respects _≈_
 First-resp-≈ = First-resp-⊆ ∘ ⊆-reflexive
 
-Flast-resp-≈ : ∀ {c} → flip (Flast {a}) c ⟶ flip (Flast {a}) c Respects _≈_
+Flast-resp-≈ : ∀ {c} → flip (Flast {a}) c ⟶ flip (Flast {b}) c Respects _≈_
 Flast-resp-≈ = Flast-resp-⊆ ∘ ⊆-reflexive
 
 ------------------------------------------------------------------------
@@ -176,12 +187,6 @@ Recomputable-resp-≈ (sub A⊆B , sub A⊇B) recomp l∈B = A⊆B (recomp (A⊇
 
 ------------------------------------------------------------------------
 -- Properties of ∅
-------------------------------------------------------------------------
--- Algebraic properties of ∅
-
-⊆-min : Min (_⊆_ {a} {b}) ∅
-⊆-min _ = sub λ ()
-
 ------------------------------------------------------------------------
 -- Membership properties of ∅
 
@@ -315,6 +320,13 @@ c∈First[A]+w′∈B⇒c∈First[A∙B] (_ , cw∈A) (_ , w′∈B) = -, -, -, 
 ε∈A+c∈First[B]⇒c∈First[A∙B] : ∀ {c} → Null A → First B c → First (A ∙ B) c
 ε∈A+c∈First[B]⇒c∈First[A∙B] ε∈A (_ , cw∈B) = -, -, -, ε∈A , cw∈B , ≋-refl
 
+c∈First[A∙B]⇒c∈First[A]⊎ε∈A+c∈First[B] :
+  ∀ (A : Language a) (B : Language b) {c} → First (A ∙ B) c → First A c ⊎ Null A × First B c
+c∈First[A∙B]⇒c∈First[A]⊎ε∈A+c∈First[B] _ B (_ , []     , xw₂ , ε∈A   , xw₂∈B , x∼c ∷ _) =
+  inj₂ (ε∈A , First-resp-∼ B x∼c (-, xw₂∈B))
+c∈First[A∙B]⇒c∈First[A]⊎ε∈A+c∈First[B] A _ (_ , x ∷ w₁ , _   , xw₁∈A , _     , x∼c ∷ _) =
+  inj₁ (First-resp-∼ A x∼c (-, xw₁∈A))
+
 -- Flast
 
 c∈Flast[B]+w∈A⇒c∈Flast[A∙B] : ∀ {c} → Flast B c → ∃[ w ] w ∈ A → Flast (A ∙ B) c
@@ -406,6 +418,7 @@ c∈Flast[B]+w∈A⇒c∈Flast[A∙B] {c = c} (x , w , xw∈B , w′ , xwcw′�
 ∙-zero : (∀ (A : Language a) → ∅ {b} ∙ A ≈ ∅ {d}) × (∀ (A : Language a) → A ∙ ∅ {b} ≈ ∅ {d})
 ∙-zero = ∙-zeroˡ , ∙-zeroʳ
 
+------------------------------------------------------------------------
 -- Structures
 
 ∙-isMagma : ∀ {a} → IsMagma _≈_ (_∙_ {c ⊔ ℓ ⊔ a})
@@ -426,15 +439,16 @@ c∈Flast[B]+w∈A⇒c∈Flast[A∙B] {c = c} (x , w , xw∈B , w′ , xwcw′�
   ; identity    = ∙-identity
   }
 
+------------------------------------------------------------------------
 -- Bundles
 
-∙-magma : ∀ {a} → Magma (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∙-magma : ∀ {a} → Magma _ _
 ∙-magma {a} = record { isMagma = ∙-isMagma {a} }
 
-∙-semigroup : ∀ {a} → Semigroup (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∙-semigroup : ∀ {a} → Semigroup _ _
 ∙-semigroup {a} = record { isSemigroup = ∙-isSemigroup {a} }
 
-∙-monoid : ∀ {a} → Monoid (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∙-monoid : ∀ {a} → Monoid _ _
 ∙-monoid {a} = record { isMonoid = ∙-isMonoid {a} }
 
 ------------------------------------------------------------------------
@@ -633,8 +647,9 @@ c∈Flast[B]⇒c∈Flast[A∪B] = P.map₂ (P.map₂ (P.map inj₂ (P.map₂ inj
 ∙-distrib-∪ = ∙-distribˡ-∪ , ∙-distribʳ-∪
 
 ∪-idem : ∀ (A : Language a) → A ∪ A ≈ A
-∪-idem A = ⊆-antisym (sub [ id , id ]′) (sub inj₁)
+∪-idem A = ⊆-antisym (sub reduce) (sub inj₁)
 
+------------------------------------------------------------------------
 -- Structures
 
 ∪-isMagma : IsMagma _≈_ (_∪_ {a})
@@ -720,46 +735,47 @@ c∈Flast[B]⇒c∈Flast[A∪B] = P.map₂ (P.map₂ (P.map inj₂ (P.map₂ inj
   ; zero                              = ∙-zero
   }
 
+------------------------------------------------------------------------
 -- Bundles
 
-∪-magma : Magma (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-magma : ∀ {a} → Magma _ _
 ∪-magma {a} = record { isMagma = ∪-isMagma {a} }
 
-∪-commutativeMagma : CommutativeMagma (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-commutativeMagma : ∀ {a} → CommutativeMagma _ _
 ∪-commutativeMagma {a} = record { isCommutativeMagma = ∪-isCommutativeMagma {a} }
 
-∪-semigroup : Semigroup (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-semigroup : ∀ {a} → Semigroup _ _
 ∪-semigroup {a} = record { isSemigroup = ∪-isSemigroup {a} }
 
-∪-band : Band (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-band : ∀ {a} → Band _ _
 ∪-band {a} = record { isBand = ∪-isBand {a} }
 
-∪-commutativeSemigroup : CommutativeSemigroup (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-commutativeSemigroup : ∀ {a} → CommutativeSemigroup _ _
 ∪-commutativeSemigroup {a} = record { isCommutativeSemigroup = ∪-isCommutativeSemigroup {a} }
 
-∪-semilattice : Semilattice (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-semilattice : ∀ {a} → Semilattice _ _
 ∪-semilattice {a} = record { isSemilattice = ∪-isSemilattice {a} }
 
-∪-monoid : Monoid (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-monoid : ∀ {a} → Monoid _ _
 ∪-monoid {a} = record { isMonoid = ∪-isMonoid {a} }
 
-∪-commutativeMonoid : CommutativeMonoid (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-commutativeMonoid : ∀ {a} → CommutativeMonoid _ _
 ∪-commutativeMonoid {a} = record { isCommutativeMonoid = ∪-isCommutativeMonoid {a} }
 
-∪-idempotentCommutativeMonoid : IdempotentCommutativeMonoid (c ⊔ ℓ ⊔ lsuc a) (c ⊔ ℓ ⊔ lsuc a)
+∪-idempotentCommutativeMonoid : ∀ {a} → IdempotentCommutativeMonoid _ _
 ∪-idempotentCommutativeMonoid {a} = record
   { isIdempotentCommutativeMonoid = ∪-isIdempotentCommutativeMonoid {a} }
 
-∪-∙-nearSemiring : NearSemiring (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∪-∙-nearSemiring : ∀ {a} → NearSemiring _ _
 ∪-∙-nearSemiring {a} = record { isNearSemiring = ∪-∙-isNearSemiring {a} }
 
-∪-∙-semiringWithoutOne : SemiringWithoutOne (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∪-∙-semiringWithoutOne : ∀ {a} → SemiringWithoutOne _ _
 ∪-∙-semiringWithoutOne {a} = record { isSemiringWithoutOne = ∪-∙-isSemiringWithoutOne {a} }
 
-∪-∙-semiringWithoutAnnihilatingZero : SemiringWithoutAnnihilatingZero (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∪-∙-semiringWithoutAnnihilatingZero : ∀ {a} → SemiringWithoutAnnihilatingZero _ _
 ∪-∙-semiringWithoutAnnihilatingZero {a} = record { isSemiringWithoutAnnihilatingZero = ∪-∙-isSemiringWithoutAnnihilatingZero {a} }
 
-∪-∙-semiring : Semiring (lsuc (c ⊔ ℓ ⊔ a)) (lsuc (c ⊔ ℓ ⊔ a))
+∪-∙-semiring : ∀ {a} → Semiring _ _
 ∪-∙-semiring {a} = record { isSemiring = ∪-∙-isSemiring {a} }
 
 ------------------------------------------------------------------------
