@@ -1,122 +1,281 @@
 {-# OPTIONS --without-K --safe #-}
 
-open import Relation.Binary using (Setoid; Symmetric; Transitive)
+open import Relation.Binary
 
 module Cfe.Context.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
 open import Cfe.Context.Base over as C
-open import Cfe.Type over
-open import Data.Empty
-open import Data.Fin as F
-open import Data.Nat as ℕ
-open import Data.Nat.Properties
+open import Cfe.Fin
+open import Cfe.Type over using ()
+  renaming
+  ( _≈_ to _≈ᵗ_
+  ; ≈-refl to ≈ᵗ-refl
+  ; ≈-sym to ≈ᵗ-sym
+  ; ≈-trans to ≈ᵗ-trans
+  ; _≤_ to _≤ᵗ_
+  ; ≤-refl to ≤ᵗ-refl
+  ; ≤-reflexive to ≤ᵗ-reflexive
+  ; ≤-trans to ≤ᵗ-trans
+  ; ≤-antisym to ≤ᵗ-antisym
+  )
+open import Data.Fin hiding (pred; _≟_) renaming (_≤_ to _≤ᶠ_)
+open import Data.Fin.Properties using (toℕ-inject₁; toℕ<n)
+  renaming
+  ( ≤-refl to ≤ᶠ-refl
+  ; ≤-reflexive to ≤ᶠ-reflexive
+  ; ≤-trans to ≤ᶠ-trans
+  ; ≤-antisym to ≤ᶠ-antisym
+  )
+open import Data.Nat renaming (_≤_ to _≤ⁿ_)
+open import Data.Nat.Properties using (module ≤-Reasoning) renaming (≤-reflexive to ≤ⁿ-reflexive)
 open import Data.Product
-open import Data.Vec
+open import Data.Vec using ([]; _∷_; Vec; insert)
+open import Data.Vec.Relation.Binary.Pointwise.Inductive as Pw using ([]; _∷_; Pointwise)
 open import Function
-open import Relation.Binary.PropositionalEquality
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+open import Relation.Nullary.Decidable using (True; toWitness; fromWitness)
 
-≋-sym : ∀ {n} → Symmetric (_≋_ {n})
-≋-sym (refl , refl , refl) = refl , refl , refl
+private
+  variable
+    n : ℕ
 
-≋-trans : ∀ {n} → Transitive (_≋_ {n})
-≋-trans (refl , refl , refl) (refl , refl , refl) = refl , refl , refl
+------------------------------------------------------------------------
+-- Properties for Pointwise
+------------------------------------------------------------------------
 
-i≤j⇒inject₁[i]≤1+j : ∀ {n i j} → i F.≤ j → inject₁ {n} i F.≤ suc j
-i≤j⇒inject₁[i]≤1+j {i = zero} i≤j = z≤n
-i≤j⇒inject₁[i]≤1+j {i = suc i} {suc j} (s≤s i≤j) = s≤s (i≤j⇒inject₁[i]≤1+j i≤j)
+  pw-antisym :
+    ∀ {a b ℓ} {A : Set a} {B : Set b} {P : REL A B ℓ} {Q : REL B A ℓ} {R : REL A B ℓ} {m n} →
+    Antisym P Q R → Antisym (Pointwise P {m} {n}) (Pointwise Q) (Pointwise R)
+  pw-antisym antisym []       []       = []
+  pw-antisym antisym (x ∷ xs) (y ∷ ys) = antisym x y ∷ pw-antisym antisym xs ys
 
-wkn₂-comm : ∀ {n i j} Γ,Δ i≤j j≤m τ₁ τ₂ → wkn₂ (wkn₂ {n} {i} Γ,Δ (≤-trans i≤j j≤m) τ₁) (s≤s j≤m) τ₂ ≋ wkn₂ (wkn₂ {i = j} Γ,Δ j≤m τ₂) (≤-trans (i≤j⇒inject₁[i]≤1+j i≤j) (s≤s j≤m)) τ₁
-wkn₂-comm record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } i≤j j≤m τ₁ τ₂ = refl , refl , eq Δ i≤j j≤m τ₁ τ₂
-  where
-  eq : ∀ {a A n m i j} ys (i≤j : i F.≤ j) (j≤m : toℕ {n} j ℕ.≤ m) y₁ y₂ →
-       insert {a} {A} (insert ys (fromℕ< (s≤s (≤-trans i≤j j≤m))) y₁) (fromℕ< (s≤s (s≤s j≤m))) y₂ ≡
-       insert (insert ys (fromℕ< (s≤s j≤m)) y₂) (fromℕ< (s≤s (≤-trans (i≤j⇒inject₁[i]≤1+j i≤j) (s≤s j≤m)))) y₁
-  eq {i = zero} _ _ _ _ _ = refl
-  eq {i = suc i} {j = suc j} (x ∷ ys) (s≤s i≤j) (s≤s j≤m) y₁ y₂ = cong (x ∷_) (eq ys i≤j j≤m y₁ y₂)
+  pw-insert :
+    ∀ {a b ℓ} {A : Set a} {B : Set b} {_∼_ : REL A B ℓ} {n} {xs : Vec A n} {ys : Vec B n} →
+    ∀ i j {i≡j : True (toℕ i ≟ toℕ j)} {x y} →
+    x ∼ y → Pointwise _∼_ xs ys → Pointwise _∼_ (insert xs i x) (insert ys j y)
+  pw-insert zero    zero          x xs       = x ∷ xs
+  pw-insert (suc i) (suc j) {i≡j} x (y ∷ xs) =
+    y ∷ pw-insert i j {i≡j |> toWitness |> cong pred |> fromWitness} x xs
 
-shift≤-identity : ∀ {n} Γ,Δ → shift≤ {n} Γ,Δ ≤-refl ≋ Γ,Δ
-shift≤-identity record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } = refl , eq₁ Γ Δ m≤n , eq₂ Δ
-  where
-  eq₁ : ∀ {a A n m} xs ys (m≤n : m ℕ.≤ n) → drop′ {a} {A} m≤n ≤-refl (ys ++ xs) ≡ xs
-  eq₁ xs [] z≤n = refl
-  eq₁ xs (_ ∷ ys) (s≤s m≤n) = eq₁ xs ys m≤n
+------------------------------------------------------------------------
+-- Properties of _≈_
+------------------------------------------------------------------------
+-- Relational Properties
 
-  eq₂ : ∀ {a A m} ys → take′ {a} {A} {m} ≤-refl ys ≡ ys
-  eq₂ [] = refl
-  eq₂ (x ∷ ys) = cong (x ∷_) (eq₂ ys)
+≈-refl : Reflexive (_≈_ {n})
+≈-refl = refl , Pw.refl ≈ᵗ-refl
 
-shift≤-idem : ∀ {n i j} Γ,Δ i≤j j≤m → shift≤ {n} {i} (shift≤ {i = j} Γ,Δ j≤m) i≤j ≋ shift≤ Γ,Δ (≤-trans i≤j j≤m)
-shift≤-idem record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } i≤j j≤m = refl , eq₁ Γ Δ m≤n i≤j j≤m , eq₂ Δ i≤j j≤m
-  where
-  eq₁ : ∀ {a A n m i j} xs ys (m≤n : m ℕ.≤ n) (i≤j : i ℕ.≤ j) (j≤m : j ℕ.≤ m) →
-        drop′ {a} {A} (≤-trans j≤m m≤n) i≤j (take′ j≤m ys ++ drop′ m≤n j≤m (ys ++ xs)) ≡
-        drop′ m≤n (≤-trans i≤j j≤m) (ys ++ xs)
-  eq₁ _ _ _ z≤n z≤n = refl
-  eq₁ xs (y ∷ ys) (s≤s m≤n) z≤n (s≤s j≤m) = cong (y ∷_) (eq₁ xs ys m≤n z≤n j≤m)
-  eq₁ xs (_ ∷ ys) (s≤s m≤n) (s≤s i≤j) (s≤s j≤m) = eq₁ xs ys m≤n i≤j j≤m
+≈-sym : Symmetric (_≈_ {n})
+≈-sym = map sym (Pw.sym ≈ᵗ-sym)
 
-  eq₂ : ∀ {a A m i j} ys (i≤j : i ℕ.≤ j) (j≤m : j ℕ.≤ m) → take′ {a} {A} i≤j (take′ j≤m ys) ≡ take′ (≤-trans i≤j j≤m) ys
-  eq₂ ys z≤n j≤m = refl
-  eq₂ (y ∷ ys) (s≤s i≤j) (s≤s j≤m) = cong (y ∷_) (eq₂ ys i≤j j≤m)
+≈-trans : Transitive (_≈_ {n})
+≈-trans = zip trans (Pw.trans ≈ᵗ-trans)
 
-shift≤-wkn₁-comm : ∀ {n i j} Γ,Δ i≤m j≥m τ →
-                   shift≤ {i = i} (wkn₁ {n} {j} Γ,Δ j≥m τ) i≤m ≋
-                   wkn₁ (shift≤ Γ,Δ i≤m) (≤-trans i≤m j≥m) τ
-shift≤-wkn₁-comm record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } i≤m j≥m τ =
-  refl , eq Γ Δ m≤n i≤m j≥m τ , refl
-  where
-  eq : ∀ {a A n m i j} xs ys (m≤n : m ℕ.≤ n) (i≤m : i ℕ.≤ m) (j≥m : toℕ {suc n} j ≥ m) y →
-       drop′ {a} {A} (≤-step m≤n) i≤m (ys ++ (insert′ xs (s≤s m≤n) (reduce≥′ (≤-step m≤n) j≥m) y)) ≡
-       insert′ (drop′ m≤n i≤m (ys ++ xs)) (s≤s (≤-trans i≤m m≤n)) (reduce≥′ (≤-step (≤-trans i≤m m≤n)) (≤-trans i≤m j≥m)) y
-  eq _ [] z≤n z≤n _ _ = refl
-  eq {j = suc _} xs (x ∷ ys) (s≤s m≤n) z≤n (s≤s j≥m) y = cong (x ∷_) (eq xs ys m≤n z≤n j≥m y)
-  eq {j = suc _} xs (_ ∷ ys) (s≤s m≤n) (s≤s i≤m) (s≤s j≥m) y = eq xs ys m≤n i≤m j≥m y
+------------------------------------------------------------------------
+-- Structures
 
-shift≤-wkn₂-comm-≤ : ∀ {n i j} Γ,Δ i≤j j≤m τ →
-                     shift≤ {i = i} (wkn₂ {n} {j} Γ,Δ j≤m τ) (≤-trans i≤j (≤-step j≤m)) ≋
-                     wkn₁ (shift≤ Γ,Δ (≤-trans i≤j j≤m)) i≤j τ
-shift≤-wkn₂-comm-≤ record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } i≤j j≤m τ =
-  refl , eq₁ Γ Δ m≤n i≤j j≤m τ , eq₂ Δ i≤j j≤m τ
-  where
-  eq₁ : ∀ {a A n m i j} xs ys (m≤n : m ℕ.≤ n) (i≤j : i ℕ.≤ toℕ {suc n} j) (j≤m : toℕ j ℕ.≤ m) y →
-        drop′ {a} {A} (s≤s m≤n) (≤-trans i≤j (≤-step j≤m)) (insert ys (fromℕ< (s≤s j≤m)) y ++ xs) ≡
-        insert′
-          (drop′ m≤n (≤-trans i≤j j≤m) (ys ++ xs))
-          (s≤s (≤-trans (≤-trans i≤j j≤m) m≤n))
-          (reduce≥′ (≤-step (≤-trans (≤-trans i≤j j≤m) m≤n)) i≤j)
-          y
-  eq₁ {j = zero} _ _ _ z≤n _ _ = refl
-  eq₁ {j = suc j} xs (x ∷ ys) (s≤s m≤n) z≤n (s≤s j≤m) y = cong (x ∷_) (eq₁ xs ys m≤n z≤n j≤m y)
-  eq₁ {j = suc j} xs (x ∷ ys) (s≤s m≤n) (s≤s i≤j) (s≤s j≤m) y = eq₁ xs ys m≤n i≤j j≤m y
+≈-isPartialEquivalence : IsPartialEquivalence (_≈_ {n})
+≈-isPartialEquivalence = record
+  { sym   = ≈-sym
+  ; trans = ≈-trans
+  }
 
-  eq₂ : ∀ {a A n m i j} ys (i≤j : i ℕ.≤ toℕ {suc n} j) (j≤m : toℕ j ℕ.≤ m) y →
-        take′ {a} {A} (≤-trans i≤j (≤-step j≤m)) (insert ys (fromℕ< (s≤s j≤m)) y) ≡
-        take′ (≤-trans i≤j j≤m) ys
-  eq₂ {j = zero} _ z≤n _ _ = refl
-  eq₂ {j = suc _} _ z≤n _ _ = refl
-  eq₂ {j = suc zero} (_ ∷ _) (s≤s z≤n) (s≤s _) _ = refl
-  eq₂ {j = suc (suc _)} (x ∷ ys) (s≤s i≤j) (s≤s j≤m) y = cong (x ∷_) (eq₂ ys i≤j j≤m y)
+≈-isEquivalence : IsEquivalence (_≈_ {n})
+≈-isEquivalence = record
+  { refl  = ≈-refl
+  ; sym   = ≈-sym
+  ; trans = ≈-trans
+  }
 
-shift≤-wkn₂-comm-> : ∀ {n i j} Γ,Δ i≤j j≤m τ →
-                     shift≤ {i = suc j} (wkn₂ {n} {i} Γ,Δ (≤-trans i≤j j≤m) τ) (s≤s j≤m) ≋
-                     wkn₂ (shift≤ Γ,Δ j≤m) i≤j τ
-shift≤-wkn₂-comm-> record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ } i≤j j≤m τ = refl , eq₁ Γ Δ m≤n i≤j j≤m τ , eq₂ Δ m≤n i≤j j≤m τ
-  where
-  eq₁ : ∀ {a A n m i j} xs ys (m≤n : m ℕ.≤ n) (i≤j : toℕ {suc n} i ℕ.≤ j) (j≤m : j ℕ.≤ m) y →
-        drop′ {a} {A} (s≤s m≤n) (s≤s j≤m) (insert ys (fromℕ< (s≤s (≤-trans i≤j j≤m))) y ++ xs) ≡
-        drop′ m≤n j≤m (ys ++ xs)
-  eq₁ {i = zero} _ _ _ _ _ _ = refl
-  eq₁ {i = suc _} xs (_ ∷ ys) (s≤s m≤n) (s≤s i≤j) (s≤s j≤m) y = eq₁ xs ys m≤n i≤j j≤m y
+------------------------------------------------------------------------
+-- Bundles
 
-  eq₂ : ∀ {a A n m i j} ys (m≤n : m ℕ.≤ n) (i≤j : toℕ {suc n} i ℕ.≤ j) (j≤m : j ℕ.≤ m) y →
-        take′ {a} {A} (s≤s j≤m) (insert ys (fromℕ< (s≤s (≤-trans i≤j j≤m))) y) ≡
-        insert (take′ j≤m ys) (fromℕ< (s≤s i≤j)) y
-  eq₂ {i = zero} _ _ _ _ _ = refl
-  eq₂ {i = suc _} (x ∷ ys) (s≤s m≤n) (s≤s i≤j) (s≤s j≤m) y = cong (x ∷_) (eq₂ ys m≤n i≤j j≤m y)
+partialSetoid : ∀ {n} → PartialSetoid _ _
+partialSetoid {n} = record { isPartialEquivalence = ≈-isPartialEquivalence {n} }
 
-shift≤-toVec : ∀ {n i} (Γ,Δ : Context n) (i≤m : i ℕ.≤ _) → toVec (shift≤ Γ,Δ i≤m) ≡ toVec Γ,Δ
-shift≤-toVec record { m = .0 ; m≤n = z≤n ; Γ = Γ ; Δ = [] } z≤n = refl
-shift≤-toVec {suc n} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } z≤n = cong (x ∷_) (shift≤-toVec (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ }) z≤n)
-shift≤-toVec {suc n} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } (s≤s i≤m) = cong (x ∷_) (shift≤-toVec (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ }) i≤m)
+setoid : ∀ {n} → Setoid _ _
+setoid {n} = record { isEquivalence = ≈-isEquivalence {n} }
+
+------------------------------------------------------------------------
+-- Properties of _≤_
+------------------------------------------------------------------------
+
+≤-refl : Reflexive (_≤_ {n})
+≤-refl = ≤ᶠ-refl , Pw.refl ≤ᵗ-refl
+
+≤-reflexive : (_≈_ {n}) ⇒ _≤_
+≤-reflexive = map (≤ᶠ-reflexive ∘ sym) (Pw.map ≤ᵗ-reflexive)
+
+≤-trans : Transitive (_≤_ {n})
+≤-trans = zip (flip ≤ᶠ-trans) (Pw.trans ≤ᵗ-trans)
+
+≤-antisym : Antisymmetric (_≈_ {n}) _≤_
+≤-antisym = zip (sym ∘₂ ≤ᶠ-antisym) (pw-antisym ≤ᵗ-antisym)
+
+------------------------------------------------------------------------
+-- Structures
+
+≤-isPreorder : IsPreorder (_≈_ {n}) _≤_
+≤-isPreorder = record
+  { isEquivalence = ≈-isEquivalence
+  ; reflexive     = ≤-reflexive
+  ; trans         = ≤-trans
+  }
+
+≤-isPartialOrder : IsPartialOrder (_≈_ {n}) _≤_
+≤-isPartialOrder = record
+  { isPreorder = ≤-isPreorder
+  ; antisym    = ≤-antisym
+  }
+
+------------------------------------------------------------------------
+-- Bundles
+
+≤-preorder : ∀ {n} → Preorder _ _ _
+≤-preorder {n} = record { isPreorder = ≤-isPreorder {n} }
+
+≤-poset : ∀ {n} → Poset _ _ _
+≤-poset {n} = record { isPartialOrder = ≤-isPartialOrder {n} }
+
+------------------------------------------------------------------------
+-- Properties of wkn₂
+------------------------------------------------------------------------
+-- Algebraic Properties
+
+wkn₂-mono :
+  ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ< i ≟ toℕ< j)} {τ₁ τ₂} →
+  τ₁ ≤ᵗ τ₂ → ctx₁ ≤ ctx₂ → wkn₂ {n} ctx₁ i τ₁ ≤ wkn₂ ctx₂ j τ₂
+wkn₂-mono i j {i≡j} τ₁≤τ₂ (g₂≤g₁ , Γ,Δ₁≤Γ,Δ₂) =
+  s≤s g₂≤g₁ ,
+  pw-insert
+    (inject<! i) (inject<! j)
+    {i≡j |> toWitness |> inject<!-cong |> cong toℕ |> fromWitness}
+    τ₁≤τ₂
+    Γ,Δ₁≤Γ,Δ₂
+
+wkn₂-cong :
+  ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ< i ≟ toℕ< j)} {τ₁ τ₂} →
+  τ₁ ≈ᵗ τ₂ → ctx₁ ≈ ctx₂ → wkn₂ {n} ctx₁ i τ₁ ≈ wkn₂ ctx₂ j τ₂
+wkn₂-cong i j {i≡j} τ₁≈τ₂ ctx₁≈ctx₂ =
+  ≤-antisym
+    (wkn₂-mono i j {i≡j} (≤ᵗ-reflexive τ₁≈τ₂) (≤-reflexive ctx₁≈ctx₂))
+    (wkn₂-mono j i
+      {i≡j |> toWitness |> sym |> fromWitness}
+      (≤ᵗ-reflexive (≈ᵗ-sym τ₁≈τ₂))
+      (≤-reflexive (≈-sym ctx₁≈ctx₂)))
+
+wkn₂-comm :
+  ∀ ctx i j τ τ′ →
+  wkn₂ (wkn₂ {n} ctx (inject<!′ {j = suc i} j) τ′) (suc i) τ ≈ wkn₂ (wkn₂ ctx i τ) (inject<′ j) τ′
+wkn₂-comm (Γ,Δ ⊐ g)          i      zero     τ τ′ = ≈-refl
+wkn₂-comm (_ ∷ Γ,Δ ⊐ suc g) (suc i) (suc j) τ τ′ =
+  wkn₂-cong zero zero ≈ᵗ-refl (wkn₂-comm (Γ,Δ ⊐ g) i j τ τ′)
+
+------------------------------------------------------------------------
+-- Properties of wkn₁
+------------------------------------------------------------------------
+-- Algebraic Properties
+
+wkn₁-mono :
+  ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ> i ≟ toℕ> j)} →
+  ∀ {τ₁ τ₂} → τ₁ ≤ᵗ τ₂ → ctx₁ ≤ ctx₂ → wkn₁ {n} ctx₁ i τ₁ ≤ wkn₁ ctx₂ j τ₂
+wkn₁-mono {_} {_ ⊐ g₁} {_ ⊐ g₂} i j {i≡j} τ₁≤τ₂ (g₂≤g₁ , Γ,Δ₁≤Γ,Δ₂) =
+  (begin
+    toℕ (inject₁ g₂) ≡⟨ toℕ-inject₁ g₂ ⟩
+    toℕ g₂           ≤⟨ g₂≤g₁ ⟩
+    toℕ g₁           ≡˘⟨ toℕ-inject₁ g₁ ⟩
+    toℕ (inject₁ g₁) ∎) ,
+  pw-insert
+    (raise> i) (raise> j)
+    {i≡j |> toWitness |> raise>-cong |> cong toℕ |> fromWitness}
+    τ₁≤τ₂
+    Γ,Δ₁≤Γ,Δ₂
+  where open ≤-Reasoning
+
+wkn₁-cong :
+  ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ> i ≟ toℕ> j)} →
+  ∀ {τ₁ τ₂} → τ₁ ≈ᵗ τ₂ → ctx₁ ≈ ctx₂ → wkn₁ {n} ctx₁ i τ₁ ≈ wkn₁ ctx₂ j τ₂
+wkn₁-cong i j {i≡j} τ₁≈τ₂ ctx₁≈ctx₂ =
+  ≤-antisym
+    (wkn₁-mono i j {i≡j} (≤ᵗ-reflexive τ₁≈τ₂) (≤-reflexive ctx₁≈ctx₂))
+    (wkn₁-mono j i
+      {i≡j |> toWitness |> sym |> fromWitness}
+      (≤ᵗ-reflexive (≈ᵗ-sym τ₁≈τ₂))
+      (≤-reflexive (≈-sym ctx₁≈ctx₂)))
+
+wkn₁-comm :
+  ∀ ctx i j τ τ′ →
+  let g = guard ctx in
+  wkn₁ (wkn₁ {n} ctx (inject>!′ {j = suc> i} j) τ′) (suc> i) τ ≈ wkn₁ (wkn₁ ctx i τ) (inject>′ j) τ′
+-- wkn₁-comm = {!!}
+wkn₁-comm (Γ,Δ ⊐ zero)      zero    zero    τ τ′ = ≈-refl
+wkn₁-comm (Γ,Δ ⊐ zero)      (suc i) zero    τ τ′ =
+  wkn₁-cong zero zero ≈ᵗ-refl
+    (wkn₁-cong (suc> i) (suc i) {toℕ>-suc> i |> fromWitness } ≈ᵗ-refl ≈-refl)
+wkn₁-comm (_ ∷ Γ,Δ ⊐ zero)  (suc i) (suc j) τ τ′ =
+  wkn₁-cong zero zero ≈ᵗ-refl (wkn₁-comm (Γ,Δ ⊐ zero) i j τ τ′)
+wkn₁-comm (_ ∷ Γ,Δ ⊐ suc g) (inj i) (inj j) τ τ′ =
+  wkn₂-cong zero zero ≈ᵗ-refl (wkn₁-comm (Γ,Δ ⊐ g) i j τ τ′)
+
+wkn₁-wkn₂-comm :
+  ∀ ctx i j τ τ′ →
+  wkn₁ (wkn₂ {n} ctx j τ′) (inj i) τ ≈ wkn₂ (wkn₁ ctx i τ) (cast<-inject₁ j) τ′
+wkn₁-wkn₂-comm (Γ,Δ ⊐ g)         i       zero    τ τ′ = ≈-refl
+wkn₁-wkn₂-comm (_ ∷ Γ,Δ ⊐ suc g) (inj i) (suc j) τ τ′ =
+  wkn₂-cong zero zero ≈ᵗ-refl (wkn₁-wkn₂-comm (Γ,Δ ⊐ g) i j τ τ′)
+
+------------------------------------------------------------------------
+-- Properties of shift
+------------------------------------------------------------------------
+
+shift-mono : ∀ {ctx₁ ctx₂ i j} → toℕ< j ≤ⁿ toℕ< i → ctx₁ ≤ ctx₂ → shift {n} ctx₁ i ≤ shift ctx₂ j
+shift-mono {i = i} {j} j≤i (_ , Γ,Δ₁≤Γ,Δ₂) =
+  (begin
+    toℕ (inject<! j) ≡⟨ toℕ<-inject<! j ⟩
+    toℕ< j           ≤⟨ j≤i ⟩
+    toℕ< i           ≡˘⟨ toℕ<-inject<! i ⟩
+    toℕ (inject<! i) ∎) ,
+  Γ,Δ₁≤Γ,Δ₂
+  where open ≤-Reasoning
+
+shift-cong :
+  ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ< i ≟ toℕ< j)} → ctx₁ ≈ ctx₂ → shift {n} ctx₁ i ≈ shift ctx₂ j
+shift-cong i j {i≡j} ctx₁≈ctx₂ =
+  ≤-antisym
+    (shift-mono (i≡j |> toWitness |> sym |> ≤ⁿ-reflexive) (≤-reflexive ctx₁≈ctx₂))
+    (shift-mono (i≡j |> toWitness |> ≤ⁿ-reflexive) (≤-reflexive (≈-sym ctx₁≈ctx₂)))
+
+shift-identity : ∀ ctx → shift {n} ctx (strengthen< (guard ctx)) ≈ ctx
+shift-identity (Γ,Δ ⊐ zero)       = ≈-refl
+shift-identity (_ ∷ Γ,Δ ⊐ suc g) = wkn₂-cong zero zero ≈ᵗ-refl (shift-identity (Γ,Δ ⊐ g))
+
+shift-trans : ∀ ctx i j → shift (shift {n} ctx i) (inject<!′-inject! j) ≈ shift {n} ctx (inject<!′ j)
+shift-trans (Γ,Δ ⊐ _)         _       zero    = ≈-refl
+shift-trans (_ ∷ Γ,Δ ⊐ suc g) (suc i) (suc j) =
+  wkn₂-cong zero zero ≈ᵗ-refl (shift-trans (Γ,Δ ⊐ g) i j)
+
+shift-wkn₁-comm :
+  ∀ ctx i j τ →
+  shift (wkn₁ {n} ctx j τ) (cast<-inject₁ i) ≈ wkn₁ (shift ctx i) (cast>-inject<! i j) τ
+shift-wkn₁-comm (Γ,Δ ⊐ zero)      zero    j τ =
+  wkn₁-cong j (cast>-inject<! zero j) {toℕ>-cast>-inject<! zero j |> fromWitness} ≈ᵗ-refl ≈-refl
+shift-wkn₁-comm (_ ∷ Γ,Δ ⊐ suc g) zero    (inj j) τ =
+  wkn₁-cong zero zero ≈ᵗ-refl (shift-wkn₁-comm (Γ,Δ ⊐ g) zero j τ)
+shift-wkn₁-comm (_ ∷ Γ,Δ ⊐ suc g) (suc i) (inj j) τ =
+  wkn₂-cong zero zero ≈ᵗ-refl (shift-wkn₁-comm (Γ,Δ ⊐ g) i j τ)
+
+shift-wkn₂-comm :
+  ∀ ctx i j τ →
+  shift (wkn₂ {n} ctx (inject<!′ j) τ) (suc i) ≈ wkn₂ (shift ctx i) (inject<!′-inject! j) τ
+shift-wkn₂-comm (Γ,Δ ⊐ g)         i       zero    τ = ≈-refl
+shift-wkn₂-comm (_ ∷ Γ,Δ ⊐ suc g) (suc i) (suc j) τ =
+  wkn₂-cong zero zero ≈ᵗ-refl (shift-wkn₂-comm (Γ,Δ ⊐ g) i j τ)
+
+shift-wkn₁-wkn₂-comm :
+  ∀ ctx i j τ →
+  shift (wkn₂ {n} ctx i τ) (inject<′ j) ≈ wkn₁ (shift ctx (inject<!′ j)) (reflect i j) τ
+shift-wkn₁-wkn₂-comm (Γ,Δ ⊐ g) zero zero τ = ≈-refl
+shift-wkn₁-wkn₂-comm (_ ∷ Γ,Δ ⊐ suc g) (suc i) zero τ = wkn₁-cong zero zero ≈ᵗ-refl (shift-wkn₁-wkn₂-comm (Γ,Δ ⊐ g) i zero τ)
+shift-wkn₁-wkn₂-comm (_ ∷ Γ,Δ ⊐ suc g) (suc i) (suc j) τ = wkn₂-cong zero zero ≈ᵗ-refl (shift-wkn₁-wkn₂-comm (Γ,Δ ⊐ g) i j τ)
