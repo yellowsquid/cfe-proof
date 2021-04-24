@@ -6,207 +6,297 @@ module Cfe.Judgement.Properties
   {c ℓ} (over : Setoid c ℓ)
   where
 
-open import Cfe.Context over as C
-  hiding
-  ( shift≤ ; wkn₁ ; wkn₂ )
-  renaming (_≋_ to _≋ᶜ_; ≋-sym to ≋ᶜ-sym; ≋-trans to ≋ᶜ-trans )
-open import Cfe.Expression over as E
+open import Cfe.Context over renaming (wkn₁ to wkn₁ᶜ; wkn₂ to wkn₂ᶜ; shift to shiftᶜ)
+open import Cfe.Fin
+open import Cfe.Expression over
 open import Cfe.Judgement.Base over
-open import Cfe.Language over
+open import Cfe.Language over using (⊆-refl)
 open import Cfe.Type over
-open import Cfe.Type.Construct.Lift over
-open import Data.Empty
-open import Data.Fin as F hiding (splitAt)
-open import Data.Fin.Properties hiding (≤-refl; ≤-trans; ≤-irrelevant)
-open import Data.Nat as ℕ hiding (_⊔_)
-open import Data.Nat.Properties renaming (≤-refl to ≤ⁿ-refl; ≤-trans to ≤ⁿ-trans; ≤-irrelevant to ≤ⁿ-irrelevant)
-open import Data.Product
-open import Data.Vec
-open import Data.Vec.Properties
-import Data.Vec.Relation.Binary.Pointwise.Extensional as PW
-open import Function
-open import Level renaming (suc to lsuc)
-open import Relation.Binary.PropositionalEquality hiding (subst₂)
+  using (Type; τ⊥; _⊨_; ⊨-min; ⊨-fix; ｛ε｝⊨τε; ｛c｝⊨τ[c]; ⊛⇒∙-pres-⊨; #⇒∨-pres-⊨)
+  renaming (_≈_ to _≈ᵗ_; ≈-refl to ≈ᵗ-refl)
+open import Data.Empty using (⊥-elim)
+open import Data.Fin using (zero; suc; toℕ; inject₁; punchIn; punchOut) renaming (_≤_ to _≤ᶠ_)
+open import Data.Fin.Properties using (_≟_; toℕ-injective; toℕ-inject₁)
+open import Data.Nat using (ℕ; suc; z≤n; _+_) renaming (_≤_ to _≤ⁿ_)
+open import Data.Nat.Properties using (pred-mono; <⇒≤pred; <⇒≢; module ≤-Reasoning)
+open import Data.Vec using (Vec; _∷_; lookup; insert; remove)
+open import Data.Vec.Properties using (insert-punchIn; remove-punchOut)
+open import Data.Vec.Relation.Binary.Pointwise.Inductive as Pw using (Pointwise; _∷_)
+open import Function using (_|>_; _∘_; _∘₂_; flip)
+open import Relation.Binary.PropositionalEquality as ≡ hiding (subst₂)
 open import Relation.Nullary
 
 private
-  toℕ-punchIn : ∀ {n} i j → toℕ j ℕ.≤ toℕ (punchIn {n} i j)
-  toℕ-punchIn zero j = n≤1+n (toℕ j)
-  toℕ-punchIn (suc i) zero = ≤ⁿ-refl
-  toℕ-punchIn (suc i) (suc j) = s≤s (toℕ-punchIn i j)
+  variable
+    n : ℕ
+    ctx ctx₁ ctx₂ : Context n
+    τ τ′ : Type ℓ ℓ
 
-  punchIn[i,j]≥m : ∀ {n m i j} → toℕ i ℕ.≤ m → toℕ j ≥ m → toℕ (punchIn {n} i j) ≥ suc m
-  punchIn[i,j]≥m {i = zero} i≤m j≥m = s≤s j≥m
-  punchIn[i,j]≥m {i = suc i} {suc j} (s≤s i≤m) (s≤s j≥m) = s≤s (punchIn[i,j]≥m i≤m j≥m)
+  punchIn< : ∀ {n i j} → toℕ i ≤ⁿ toℕ j → punchIn {n} i j ≡ suc j
+  punchIn< {i = zero} {j} i≤j = refl
+  punchIn< {i = suc i} {suc j} i≤j = cong suc (punchIn< (pred-mono i≤j))
 
-congᶜ : ∀ {n} {Γ,Δ Γ,Δ′ : Context n} {e τ} → Γ,Δ ≋ᶜ Γ,Δ′ → Γ,Δ ⊢ e ∶ τ → Γ,Δ′ ⊢ e ∶ τ
-congᶜ {Γ,Δ = Γ,Δ} {Γ,Δ′} (refl , refl , refl) Γ,Δ⊢e∶τ with ≤ⁿ-irrelevant (Context.m≤n Γ,Δ) (Context.m≤n Γ,Δ′)
-... | refl = Γ,Δ⊢e∶τ
-
-congᵗ : ∀ {n} {Γ,Δ : Context n} {e τ τ′} → τ ≡ τ′ → Γ,Δ ⊢ e ∶ τ → Γ,Δ ⊢ e ∶ τ′
-congᵗ refl Γ,Δ⊢e∶τ = Γ,Δ⊢e∶τ
-
-wkn₁ : ∀ {n} {Γ,Δ : Context n} {e τ} → Γ,Δ ⊢ e ∶ τ → ∀ {i} i≥m τ′ → C.wkn₁ {i = i} Γ,Δ i≥m τ′ ⊢ wkn e i ∶ τ
-wkn₁ Eps i≥m τ′ = Eps
-wkn₁ (Char c) i≥m τ′ = Char c
-wkn₁ Bot i≥m τ′ = Bot
-wkn₁ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} (Var {i = j} j≥m) {i = i} i≥m τ′ =
-  congᵗ (τ≡τ′ Γ m≤n i≥m j≥m τ′) (Var (≤ⁿ-trans j≥m (toℕ-punchIn i j)))
+wkn₁ : ∀ {e} → ctx ⊢ e ∶ τ → ∀ i τ′ → wkn₁ᶜ ctx i τ′ ⊢ wkn e (raise!> i) ∶ τ
+wkn₁ Eps      i τ′ = Eps
+wkn₁ (Char c) i τ′ = Char c
+wkn₁ Bot      i τ′ = Bot
+wkn₁ {ctx = Γ,Δ ⊐ g} (Var j) i τ′ =
+  ≡.subst₂ (wkn₁ᶜ (Γ,Δ ⊐ g) i τ′ ⊢_∶_) (cong Var eqⁱ) eqᵗ (Var (punchIn> i j))
   where
-  τ≡τ′ : ∀ {a A n m i j} xs (m≤n : m ℕ.≤ n) (i≥m : toℕ i ≥ _) j≥m x →
-    lookup {a} {A}
-      (insert′ xs (s≤s m≤n) (reduce≥′ (≤-step m≤n) i≥m) x)
-      (reduce≥′ (≤-step m≤n) (≤ⁿ-trans j≥m (toℕ-punchIn i j))) ≡
-    lookup xs (reduce≥′ m≤n j≥m)
-  τ≡τ′ {i = zero} {j} (y ∷ xs) z≤n z≤n z≤n x = refl
-  τ≡τ′ {i = suc i} {zero} (y ∷ xs) z≤n z≤n z≤n x = refl
-  τ≡τ′ {i = suc i} {suc j} (y ∷ xs) z≤n z≤n z≤n x = τ≡τ′ {i = i} xs z≤n z≤n z≤n x
-  τ≡τ′ {i = suc i} {suc j} xs (s≤s m≤n) (s≤s i≥m) (s≤s j≥m) x = τ≡τ′ xs m≤n i≥m j≥m x
-wkn₁ (Fix Γ,Δ⊢e∶τ) i≥m τ′ = Fix (wkn₁ Γ,Δ⊢e∶τ (s≤s i≥m) τ′)
-wkn₁ {Γ,Δ = Γ,Δ} (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) i≥m τ′ = Cat (wkn₁ Γ,Δ⊢e₁∶τ₁ i≥m τ′) (congᶜ (≋ᶜ-sym (shift≤-wkn₁-comm Γ,Δ z≤n i≥m τ′)) (wkn₁ Δ++Γ,∙⊢e₂∶τ₂ z≤n τ′)) τ₁⊛τ₂
-wkn₁ (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) i≥m τ′ = Vee (wkn₁ Γ,Δ⊢e₁∶τ₁ i≥m τ′) (wkn₁ Γ,Δ⊢e₂∶τ₂ i≥m τ′) τ₁#τ₂
+  open ≡-Reasoning
+  lookup′ = lookup (insert Γ,Δ (raise!> i) τ′)
+  eqⁱ = toℕ-injective (begin
+    toℕ (raise!> (punchIn> i j))         ≡⟨ toℕ-raise!> (punchIn> i j) ⟩
+    toℕ> (punchIn> i j)                 ≡⟨ toℕ-punchIn> i j ⟩
+    toℕ (punchIn (raise!> i) (raise!> j)) ∎)
+  eqᵗ = begin
+    lookup′ (raise!> (punchIn> i j))         ≡⟨ cong (lookup (insert Γ,Δ (raise!> i) τ′)) eqⁱ ⟩
+    lookup′ (punchIn (raise!> i) (raise!> j)) ≡⟨ insert-punchIn Γ,Δ (raise!> i) τ′ (raise!> j) ⟩
+    lookup Γ,Δ (raise!> j)                   ∎
+wkn₁ {ctx = ctx} {τ} {μ e} (Fix ctx⊢e∶τ) i τ′ =
+  Fix (subst
+    (_⊢ wkn e (suc (raise!> i)) ∶ τ)
+    (sym (wkn₁-wkn₂-comm ctx i zero τ′ τ))
+    (wkn₁ ctx⊢e∶τ (inj i) τ′))
+wkn₁ {ctx = ctx} {e = _ ∙ e₂} (Cat {τ₂ = τ₂} ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁⊛τ₂) i τ′ =
+  Cat
+    (wkn₁ ctx⊢e₁∶τ₁ i τ′)
+    (≡.subst₂
+      (_⊢_∶ τ₂)
+      (sym (shift-wkn₁-comm ctx zero i τ′))
+      (toℕ-cast> z≤n i |> raise!>-cong |> toℕ-injective |> cong (wkn e₂))
+      (wkn₁ ctx⊢e₂∶τ₂ (cast> z≤n i) τ′))
+    τ₁⊛τ₂
+wkn₁ (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁#τ₂) i τ′ = Vee (wkn₁ ctx⊢e₁∶τ₁ i τ′) (wkn₁ ctx⊢e₂∶τ₂ i τ′) τ₁#τ₂
 
-wkn₂ : ∀ {n} {Γ,Δ : Context n} {e τ} → Γ,Δ ⊢ e ∶ τ → ∀ {i} i≤m τ′ → C.wkn₂ {i = i} Γ,Δ i≤m τ′ ⊢ wkn e i ∶ τ
-wkn₂ Eps i≤m τ′ = Eps
-wkn₂ (Char c) i≤m τ′ = Char c
-wkn₂ Bot i≤m τ′ = Bot
-wkn₂ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }}(Var {i = j} j≥m) i≤m τ′ = congᵗ (τ≡τ′ Γ m≤n i≤m j≥m) (Var (punchIn[i,j]≥m i≤m j≥m))
+wkn₂ : ∀ {e} → ctx ⊢ e ∶ τ → ∀ i τ′ → wkn₂ᶜ ctx i τ′ ⊢ wkn e (inject!< i) ∶ τ
+wkn₂ Eps      i τ′ = Eps
+wkn₂ (Char c) i τ′ = Char c
+wkn₂ Bot      i τ′ = Bot
+wkn₂ {ctx = Γ,Δ ⊐ g} (Var j) i τ′ =
+  ≡.subst₂ (wkn₂ᶜ (Γ,Δ ⊐ g) i τ′ ⊢_∶_) (cong Var eqⁱ) eqᵗ (Var (inj j))
   where
-  τ≡τ′ : ∀ {a A n m i j} xs (m≤n : m ℕ.≤ n) (i≤m : toℕ i ℕ.≤ _) (j≥m : toℕ j ≥ _) →
-         lookup {a} {A} xs (reduce≥′ (s≤s m≤n) (punchIn[i,j]≥m i≤m j≥m)) ≡
-         lookup xs (reduce≥′ m≤n j≥m)
-  τ≡τ′ {i = zero} _ z≤n _ _ = refl
-  τ≡τ′ {i = zero} _ (s≤s _) _ _ = refl
-  τ≡τ′ {i = suc i} {suc j} xs (s≤s m≤n) (s≤s i≤m) (s≤s j≥m) = τ≡τ′ xs m≤n i≤m j≥m
-wkn₂ (Fix Γ,Δ⊢e∶τ) i≤m τ′ = Fix (wkn₂ Γ,Δ⊢e∶τ (s≤s i≤m) τ′)
-wkn₂ {Γ,Δ = Γ,Δ} (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) i≤m τ′ = Cat (wkn₂ Γ,Δ⊢e₁∶τ₁ i≤m τ′) (congᶜ (≋ᶜ-sym (shift≤-wkn₂-comm-≤ Γ,Δ z≤n i≤m τ′)) (wkn₁ Δ++Γ,∙⊢e₂∶τ₂ z≤n τ′)) τ₁⊛τ₂
-wkn₂ (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) i≤m τ′ = Vee (wkn₂ Γ,Δ⊢e₁∶τ₁ i≤m τ′) (wkn₂ Γ,Δ⊢e₂∶τ₂ i≤m τ′) τ₁#τ₂
+  lookup′ = lookup (insert Γ,Δ (inject!< i) τ′)
+  eqⁱ = sym (punchIn< (begin
+    toℕ (inject!< i)  ≡⟨ toℕ-inject!< i ⟩
+    toℕ< i            ≤⟨ <⇒≤pred (toℕ<<i i) ⟩
+    toℕ g             ≤⟨ toℕ>≥i j ⟩
+    toℕ> j            ≡˘⟨ toℕ-raise!> j ⟩
+    toℕ (raise!> j)    ∎))
+    where open ≤-Reasoning
+  eqᵗ = begin
+    lookup′ (raise!> (inj j))                  ≡⟨ cong lookup′ eqⁱ ⟩
+    lookup′ (punchIn (inject!< i) (raise!> j)) ≡⟨ insert-punchIn Γ,Δ (inject!< i) τ′ (raise!> j) ⟩
+    lookup Γ,Δ (raise!> j)                     ∎
+    where open ≡-Reasoning
+wkn₂ {ctx = ctx} {τ} {μ e} (Fix ctx⊢e∶τ) i τ′ =
+  Fix (subst
+    (_⊢ wkn e (inject!< (suc i)) ∶ τ)
+    (wkn₂-comm ctx i zero τ′ τ)
+    (wkn₂ ctx⊢e∶τ (suc i) τ′))
+wkn₂ {ctx = ctx} {e = _ ∙ e₂} (Cat {τ₂ = τ₂} ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁⊛τ₂) i τ′ =
+  Cat
+    (wkn₂ ctx⊢e₁∶τ₁ i τ′)
+    (≡.subst₂
+      (_⊢_∶ τ₂)
+      (sym (shift-wkn₁-wkn₂-comm ctx i zero τ′))
+      (cong (wkn e₂) (toℕ-injective (begin
+        toℕ (raise!> (reflect! i zero)) ≡⟨ toℕ-raise!> (reflect! i zero) ⟩
+        toℕ> (reflect! i zero)          ≡⟨ toℕ-reflect! i zero ⟩
+        toℕ< i                          ≡˘⟨ toℕ-inject!< i ⟩
+        toℕ (inject!< i)                ∎)))
+      (wkn₁ ctx⊢e₂∶τ₂ (reflect! i zero) τ′))
+    τ₁⊛τ₂
+  where open ≡-Reasoning
+wkn₂ (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁#τ₂) i τ′ = Vee (wkn₂ ctx⊢e₁∶τ₁ i τ′) (wkn₂ ctx⊢e₂∶τ₂ i τ′) τ₁#τ₂
 
-shift≤ : ∀ {n} {Γ,Δ : Context n} {e τ} → Γ,Δ ⊢ e ∶ τ → ∀ {i} (i≤m : i ℕ.≤ _) → C.shift≤ Γ,Δ i≤m ⊢ e ∶ τ
-shift≤ Eps i≤m = Eps
-shift≤ (Char c) i≤m = Char c
-shift≤ Bot i≤m = Bot
-shift≤ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} (Var {i = j} j≥m) i≤m =
-  congᵗ (τ≡τ′ Γ Δ m≤n i≤m j≥m) (Var (≤ⁿ-trans i≤m j≥m))
+shift : ∀ {e} → ctx ⊢ e ∶ τ → ∀ i → shiftᶜ ctx i ⊢ e ∶ τ
+shift Eps      i = Eps
+shift (Char c) i = Char c
+shift Bot      i = Bot
+shift {ctx = Γ,Δ ⊐ g} {τ} (Var j) i =
+  ≡.subst₂
+    (Γ,Δ ⊐ inject!< i ⊢_∶_)
+    (toℕ-cast> i≤g j |> raise!>-cong |> toℕ-injective |> cong Var)
+    (toℕ-cast> i≤g j |> raise!>-cong |> toℕ-injective |> cong (lookup Γ,Δ))
+    (Var (cast> i≤g j))
   where
-  τ≡τ′ : ∀ {a A n m i j} xs ys (m≤n : m ℕ.≤ n) (i≤m : i ℕ.≤ m) (j≥m : toℕ j ≥ m) →
-         lookup {a} {A} (drop′ m≤n i≤m (ys ++ xs)) (reduce≥′ (≤ⁿ-trans i≤m m≤n) (≤ⁿ-trans i≤m j≥m)) ≡
-         lookup xs (reduce≥′ m≤n j≥m)
-  τ≡τ′ xs [] z≤n z≤n z≤n = refl
-  τ≡τ′ {j = suc j} xs (x ∷ ys) (s≤s m≤n) z≤n (s≤s j≥m) = τ≡τ′ xs ys m≤n z≤n j≥m
-  τ≡τ′ {j = suc j} xs (x ∷ ys) (s≤s m≤n) (s≤s i≤m) (s≤s j≥m) = τ≡τ′ xs ys m≤n i≤m j≥m
-shift≤ {Γ,Δ = Γ,Δ} {τ = τ} (Fix Γ,Δ⊢e∶τ) {i} i≤m = Fix (congᶜ (shift≤-wkn₂-comm-> Γ,Δ z≤n i≤m τ) (shift≤ Γ,Δ⊢e∶τ (s≤s i≤m)))
-shift≤ {Γ,Δ = Γ,Δ} (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) i≤m =
-  Cat (shift≤ Γ,Δ⊢e₁∶τ₁ i≤m)
-      (congᶜ (≋ᶜ-trans (shift≤-identity (shift Γ,Δ))
-                       (≋ᶜ-sym (shift≤-idem Γ,Δ z≤n i≤m)))
-             (shift≤ Δ++Γ,∙⊢e₂∶τ₂ z≤n))
-      τ₁⊛τ₂
-shift≤ (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) i≤m = Vee (shift≤ Γ,Δ⊢e₁∶τ₁ i≤m) (shift≤ Γ,Δ⊢e₂∶τ₂ i≤m) τ₁#τ₂
+  i≤g : inject!< i ≤ᶠ g
+  i≤g = begin
+    toℕ (inject!< i) ≡⟨ toℕ-inject!< i ⟩
+    toℕ< i           ≤⟨ <⇒≤pred (toℕ<<i i) ⟩
+    toℕ g            ∎
+    where open ≤-Reasoning
+shift {ctx = ctx} {τ} {μ e} (Fix ctx⊢e∶τ) i =
+  Fix (subst (_⊢ e ∶ τ) (shift-wkn₂-comm ctx i zero τ) (shift ctx⊢e∶τ (suc i)))
+shift {ctx = ctx} {_} {_ ∙ e₂} (Cat {τ₂ = τ₂} ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁⊛τ₂) i =
+  Cat
+    (shift ctx⊢e₁∶τ₁ i)
+    (subst (_⊢ e₂ ∶ τ₂) (sym (shift-trans ctx i zero)) ctx⊢e₂∶τ₂)
+    τ₁⊛τ₂
+shift (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁#τ₂) i = Vee (shift ctx⊢e₁∶τ₁ i) (shift ctx⊢e₂∶τ₂ i) τ₁#τ₂
 
-subst₁ : ∀ {n} {Γ,Δ : Context n} {e τ i τ′} (i≥m : toℕ i ≥ _) → C.wkn₁ Γ,Δ i≥m τ′ ⊢ e ∶ τ → ∀ {e′} → Γ,Δ ⊢ e′ ∶ τ′ → Γ,Δ ⊢ e [ e′ / i ] ∶ τ
-subst₁ _ Eps Γ,Δ⊢e′∶τ′ = Eps
-subst₁ _ (Char c) Γ,Δ⊢e′∶τ′ = Char c
-subst₁ _ Bot Γ,Δ⊢e′∶τ′ = Bot
-subst₁ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} {i = i} {τ′} i≥m (Var {i = j} j≥m) Γ,Δ⊢e′∶τ′ with  i F.≟ j
-... | no i≢j =
-  congᵗ (sym (τ≡τ′ Γ m≤n i≢j i≥m j≥m τ′)) (Var (punchOut≥m i≢j i≥m j≥m))
+subst₁ :
+  ∀ {e} → ctx ⊢ e ∶ τ →
+  ∀ i {e′} → remove₁ ctx i ⊢ e′ ∶ lookup (Γ,Δ ctx) (raise!> i) →
+  remove₁ ctx i ⊢ e [ e′ / raise!> i ] ∶ τ
+subst₁ Eps      i ctx⊢e′∶τ′ = Eps
+subst₁ (Char c) i ctx⊢e′∶τ′ = Char c
+subst₁ Bot      i ctx⊢e′∶τ′ = Bot
+subst₁ {ctx = Γ,Δ ⊐ g} (Var j) i {e′} ctx⊢e′∶τ′ with raise!> i ≟ raise!> j
+... | yes i≡j = subst (remove₁ (Γ,Δ ⊐ g) i ⊢ e′ ∶_) (cong (lookup Γ,Δ) i≡j) ctx⊢e′∶τ′
+... | no i≢j  = ≡.subst₂ (remove₁ (Γ,Δ ⊐ g) i ⊢_∶_ ) (cong Var eqⁱ) eqᵗ (Var (punchOut> i≢j))
   where
-  punchOut≥m : ∀ {n m i j} → (i≢j : i ≢ j) → toℕ {suc n} i ≥ m → toℕ j ≥ m → toℕ (punchOut i≢j) ≥ m
-  punchOut≥m {m = zero} _ z≤n _ = z≤n
-  punchOut≥m {n = suc _} {.(suc _)} {suc _} {suc _} i≢j (s≤s i≥m) (s≤s j≥m) = s≤s (punchOut≥m (i≢j ∘ cong suc) i≥m j≥m)
+  open ≡-Reasoning
+  lookup′ = lookup (remove Γ,Δ (raise!> i))
+  eqⁱ = toℕ-injective (begin
+    toℕ (raise!> (punchOut> i≢j)) ≡⟨ toℕ-raise!> (punchOut> i≢j) ⟩
+    toℕ> (punchOut> i≢j)          ≡⟨ toℕ-punchOut> i≢j ⟩
+    toℕ (punchOut i≢j)            ∎)
 
-  τ≡τ′ : ∀ {a A n m i j} xs (m≤n : m ℕ.≤ n) (i≢j : i ≢ j) (i≥m : toℕ i ≥ m) (j≥m : toℕ j ≥ m) x →
-        lookup {a} {A} (insert′ xs (s≤s m≤n) (reduce≥′ (≤-step m≤n) i≥m) x) (reduce≥′ (≤-step m≤n) j≥m) ≡
-        lookup xs (reduce≥′ m≤n (punchOut≥m i≢j i≥m j≥m))
-  τ≡τ′ {i = zero} {zero} xs m≤n i≢j i≥m j≥m x = ⊥-elim (i≢j refl)
-  τ≡τ′ {n = suc n} {i = zero} {suc j} xs z≤n i≢j z≤n z≤n x = refl
-  τ≡τ′ {n = suc n} {i = suc i} {zero} (y ∷ xs) z≤n i≢j z≤n z≤n x = refl
-  τ≡τ′ {n = suc n} {i = suc i} {suc j} (y ∷ xs) z≤n i≢j z≤n z≤n x = τ≡τ′ xs z≤n (i≢j ∘ cong suc) z≤n z≤n x
-  τ≡τ′ {n = suc n} {i = suc i} {suc j} xs (s≤s m≤n) i≢j (s≤s i≥m) (s≤s j≥m) x = τ≡τ′ xs m≤n (i≢j ∘ cong suc) i≥m j≥m x
-... | yes refl with ≤ⁿ-irrelevant i≥m j≥m
-... | refl = congᵗ (sym (τ≡τ′ Γ m≤n i≥m τ′)) Γ,Δ⊢e′∶τ′
+  eqᵗ = begin
+    lookup′ (raise!> (punchOut> i≢j)) ≡⟨ cong lookup′ eqⁱ ⟩
+    lookup′ (punchOut i≢j)            ≡⟨ remove-punchOut Γ,Δ i≢j ⟩
+    lookup Γ,Δ (raise!> j)            ∎
+subst₁ {ctx = ctx} {τ} {μ e} (Fix ctx⊢e∶τ) i {e′} ctx⊢e′∶τ′ =
+  Fix (subst
+    (_⊢ e [ wkn e′ zero / suc (raise!> i) ] ∶ τ)
+    (remove₁-wkn₂-comm ctx i zero τ)
+    (subst₁
+      ctx⊢e∶τ
+      (inj i)
+      (subst
+        (_⊢ wkn e′ zero ∶ lookup (Γ,Δ ctx) (raise!> i))
+        (sym (remove₁-wkn₂-comm ctx i zero τ))
+        (wkn₂ ctx⊢e′∶τ′ zero τ))))
+subst₁ {ctx = ctx} {_} {_ ∙ e₂} (Cat {τ₂ = τ₂} ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁⊛τ₂) i {e′} ctx⊢e′∶τ′ =
+  Cat
+    (subst₁ ctx⊢e₁∶τ₁ i ctx⊢e′∶τ′)
+    (≡.subst₂
+      (_⊢_∶ τ₂ )
+      (remove₁-shift-comm ctx zero i)
+      (toℕ-cast> z≤n i |> raise!>-cong |> toℕ-injective |> cong (e₂ [ e′ /_]))
+      (subst₁
+        ctx⊢e₂∶τ₂
+        (cast> z≤n i)
+        (≡.subst₂ (_⊢ e′ ∶_)
+          (sym (remove₁-shift-comm ctx zero i))
+          (toℕ-cast> z≤n i |> raise!>-cong |> toℕ-injective |> cong (lookup (Γ,Δ ctx)) |> sym)
+          (shift ctx⊢e′∶τ′ zero))))
+    τ₁⊛τ₂
+subst₁ (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁#τ₂) i ctx⊢e′∶τ′ =
+  Vee (subst₁ ctx⊢e₁∶τ₁ i ctx⊢e′∶τ′) (subst₁ ctx⊢e₂∶τ₂ i ctx⊢e′∶τ′) τ₁#τ₂
+
+subst₂ :
+  ∀ {e} → ctx ⊢ e ∶ τ →
+  ∀ i {e′} → shiftᶜ (remove₂ ctx i) zero ⊢ e′ ∶ lookup (Γ,Δ ctx) (inject!< i) →
+  remove₂ ctx i ⊢ e [ e′ / inject!< i ] ∶ τ
+subst₂ Eps      i ctx⊢e′∶τ′ = Eps
+subst₂ (Char c) i ctx⊢e′∶τ′ = Char c
+subst₂ Bot      i ctx⊢e′∶τ′ = Bot
+subst₂ {ctx = Γ,Δ ⊐ suc g} (Var (inj j)) i ctx⊢e′∶τ′ with inject!< i ≟ raise!> (inj j)
+... | yes i≡j = ⊥-elim (flip <⇒≢ (cong toℕ i≡j) (begin-strict
+  toℕ (inject!< i) ≡⟨ toℕ-inject!< i ⟩
+  toℕ< i           <⟨ toℕ<<i i ⟩
+  toℕ (suc g)      ≤⟨ toℕ>≥i (inj j) ⟩
+  toℕ> (inj j)     ≡˘⟨ toℕ-raise!> (inj j) ⟩
+  toℕ (raise!> (inj j))  ∎))
+  where open ≤-Reasoning
+... | no i≢j  = ≡.subst₂ (remove₂ (Γ,Δ ⊐ suc g) i ⊢_∶_ ) (cong Var eqⁱ) eqᵗ (Var j)
   where
-  τ≡τ′ : ∀ {a A n m i} xs (m≤n : m ℕ.≤ n) (i≥m : toℕ i ≥ m) x →
-         lookup {a} {A} (insert′ xs (s≤s m≤n) (reduce≥′ (≤-step m≤n) i≥m) x) (reduce≥′ (≤-step m≤n) i≥m) ≡ x
-  τ≡τ′ {i = zero} xs z≤n z≤n x = refl
-  τ≡τ′ {i = suc i} (y ∷ xs) z≤n z≤n x = insert-lookup xs i x
-  τ≡τ′ {i = suc i} xs (s≤s m≤n) (s≤s i≥m) = τ≡τ′ xs m≤n i≥m
-subst₁ {τ = τ} i≥m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ = Fix (subst₁ (s≤s i≥m) Γ,Δ⊢e∶τ (wkn₂ Γ,Δ⊢e′∶τ′ z≤n τ))
-subst₁ {Γ,Δ = Γ,Δ} {i = i} {τ′} i≥m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ = Cat (subst₁ i≥m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₁ z≤n (congᶜ (shift≤-wkn₁-comm Γ,Δ z≤n i≥m τ′) Δ++Γ,∙⊢e₂∶τ₂) (shift≤ Γ,Δ⊢e′∶τ′ z≤n)) τ₁⊛τ₂
-subst₁ i≥m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ = Vee (subst₁ i≥m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₁ i≥m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′) τ₁#τ₂
-
-
-subst₂ : ∀ {n} {Γ,Δ : Context n} {e τ i τ′} (i≤m : toℕ i ℕ.≤ _) → C.wkn₂ Γ,Δ i≤m τ′ ⊢ e ∶ τ → ∀ {e′} → shift Γ,Δ ⊢ e′ ∶ τ′ → Γ,Δ ⊢ e [ e′ / i ] ∶ τ
-subst₂ i≤m Eps Γ,Δ⊢e′∶τ′ = Eps
-subst₂ i≤m (Char c) Γ,Δ⊢e′∶τ′ = Char c
-subst₂ i≤m Bot Γ,Δ⊢e′∶τ′ = Bot
-subst₂ {Γ,Δ = record { m = m ; m≤n = m≤n ; Γ = Γ ; Δ = Δ }} {i = i} i≤m (Var {i = j} j>m) Γ,Δ⊢e′∶τ′ with i F.≟ j
-... | yes refl = ⊥-elim (<⇒≱ j>m i≤m)
-... | no i≢j = congᵗ (cong (lookup Γ) (τ≡τ′ m≤n i≢j i≤m j>m)) (Var (punchOut≥m i≢j i≤m j>m))
+  open ≡-Reasoning
+  lookup′ = lookup (remove Γ,Δ (inject!< i))
+  eqⁱ = trans (inj-punchOut i≢j) (sym (toℕ-raise!> j)) |> toℕ-injective |> sym
+  eqᵗ = begin
+    lookup′ (raise!> j)          ≡⟨ cong lookup′ eqⁱ ⟩
+    lookup′ (punchOut i≢j)       ≡⟨ remove-punchOut Γ,Δ i≢j ⟩
+    lookup Γ,Δ (raise!> (inj j)) ∎
+subst₂ {n} {ctx = ctx @ (Γ,Δ ⊐ suc g)} {τ} {μ e} (Fix ctx⊢e∶τ) i {e′} ctx⊢e′∶τ′ =
+  Fix (subst
+    (_⊢ e [ wkn e′ zero / suc (inject!< i) ] ∶ τ)
+    (remove₂-wkn₂-comm ctx i zero τ)
+    (subst₂
+      ctx⊢e∶τ
+      (suc i)
+      (subst
+        (_⊢ wkn e′ zero ∶ lookup Γ,Δ (inject!< i))
+        (begin
+          wkn₁ᶜ (shiftᶜ (remove₂ ctx i) zero) zero τ       ≡˘⟨ shift-wkn₁-wkn₂-comm (remove₂ ctx i) zero zero τ ⟩
+          shiftᶜ (wkn₂ᶜ (remove₂ ctx i) zero τ) zero       ≡˘⟨ shift-cong-≡ zero zero (remove₂-wkn₂-comm ctx i zero τ) ⟩
+          shiftᶜ (remove₂ (wkn₂ᶜ ctx zero τ) (suc i)) zero ∎)
+        (wkn₁ ctx⊢e′∶τ′ zero τ))))
+  where open ≡-Reasoning
+subst₂ {ctx = Γ,Δ ⊐ suc g} {_} {_ ∙ e₂} (Cat {τ₂ = τ₂} ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁⊛τ₂) i {e′} ctx⊢e′∶τ′ =
+  Cat
+    (subst₂ ctx⊢e₁∶τ₁ i ctx⊢e′∶τ′)
+    (≡.subst₂
+      (_⊢_∶ τ₂)
+      (remove₁-remove₂-shift-comm (Γ,Δ ⊐ suc g) i zero)
+      (eqⁱ |> cong (e₂ [ e′ /_]))
+      (subst₁
+        ctx⊢e₂∶τ₂
+        (cast> z≤n (reflect i zero))
+        (≡.subst₂
+          (_⊢ e′ ∶_)
+          (sym (remove₁-remove₂-shift-comm (Γ,Δ ⊐ suc g) i zero))
+          (eqⁱ |> cong (lookup Γ,Δ) |> sym)
+          (shift ctx⊢e′∶τ′ zero))))
+    τ₁⊛τ₂
   where
-  punchOut≥m : ∀ {n m i j} → (i≢j : i ≢ j) → toℕ {suc n} i ℕ.≤ m → toℕ j > m → toℕ (punchOut i≢j) ≥ m
-  punchOut≥m {m = zero} i≢j i≤m j>m = z≤n
-  punchOut≥m {m = suc _} {zero} {suc _} _ _ (s≤s j>m) = j>m
-  punchOut≥m {n = suc _} {i = suc _} {suc _} i≢j (s≤s i≤m) (s≤s j>m) = s≤s (punchOut≥m (i≢j ∘ cong suc) i≤m j>m)
+  open ≡-Reasoning
+  eqⁱ = toℕ-injective (begin
+    toℕ (raise!> (cast> _ (reflect i zero))) ≡⟨ toℕ-raise!> (cast> _ (reflect i zero)) ⟩
+    toℕ> (cast> _ (reflect i zero))          ≡⟨ toℕ-cast> z≤n (reflect i zero) ⟩
+    toℕ> (reflect i zero)                    ≡⟨ toℕ-reflect i zero ⟩
+    toℕ< i                                   ≡˘⟨ toℕ-inject!< i ⟩
+    toℕ (inject!< i)                         ∎)
+subst₂ (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁#τ₂) i ctx⊢e′∶τ′ =
+  Vee (subst₂ ctx⊢e₁∶τ₁ i ctx⊢e′∶τ′) (subst₂ ctx⊢e₂∶τ₂ i ctx⊢e′∶τ′) τ₁#τ₂
 
-  τ≡τ′ : ∀ {n m i j} (m≤n : m ℕ.≤ n) (i≢j : i ≢ j) (i≤m : toℕ i ℕ.≤ m) (j>m : toℕ j > m) →
-    reduce≥′ m≤n (punchOut≥m i≢j i≤m j>m) ≡ reduce≥′ (s≤s m≤n) j>m
-  τ≡τ′ {m = zero} {zero} {suc _} m≤n i≢j z≤n (s≤s z≤n) = refl
-  τ≡τ′ {m = suc _} {zero} {suc _} m≤n i≢j z≤n (s≤s j>m) = refl
-  τ≡τ′ {n = suc _} {i = suc _} {suc _} (s≤s m≤n) i≢j (s≤s i≤m) (s≤s j>m) = τ≡τ′ m≤n (i≢j ∘ cong suc) i≤m j>m
+soundness : ∀ {e} → ctx ⊢ e ∶ τ → ∀ γ → Pointwise _⊨_ γ (Γ,Δ ctx) → ⟦ e ⟧ γ ⊨ τ
+soundness           Eps                             γ γ⊨Γ,Δ = ｛ε｝⊨τε
+soundness           (Char c)                        γ γ⊨Γ,Δ = ｛c｝⊨τ[c] c
+soundness           Bot                             γ γ⊨Γ,Δ = ⊨-min τ⊥
+soundness           (Var j)                         γ γ⊨Γ,Δ = Pw.lookup γ⊨Γ,Δ (raise!> j)
+soundness {e = μ e} (Fix ctx⊢e∶τ)                   γ γ⊨Γ,Δ =
+  ⊨-fix
+    (λ X⊆Y → ⟦⟧-mono-env e (X⊆Y ∷ Pw.refl ⊆-refl))
+    (λ {A} A⊨τ → soundness ctx⊢e∶τ (A ∷ γ) (A⊨τ ∷ γ⊨Γ,Δ))
+soundness           (Cat ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁⊛τ₂) γ γ⊨Γ,Δ =
+  ⊛⇒∙-pres-⊨ τ₁⊛τ₂ (soundness ctx⊢e₁∶τ₁ γ γ⊨Γ,Δ) (soundness ctx⊢e₂∶τ₂ γ γ⊨Γ,Δ)
+soundness           (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ,Δ =
+  #⇒∨-pres-⊨ τ₁#τ₂ (soundness ctx⊢e₁∶τ₁ γ γ⊨Γ,Δ) (soundness ctx⊢e₂∶τ₂ γ γ⊨Γ,Δ)
 
-subst₂ {Γ,Δ = Γ,Δ} {τ = τ} {τ′ = τ′} i≤m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ =
-  Fix (subst₂ (s≤s i≤m)
-              (congᶜ (≋ᶜ-sym (wkn₂-comm Γ,Δ z≤n i≤m τ τ′)) Γ,Δ⊢e∶τ)
-              (congᶜ (≋ᶜ-sym (shift≤-wkn₂-comm-≤ Γ,Δ z≤n z≤n τ)) (wkn₁ Γ,Δ⊢e′∶τ′ z≤n τ)))
-subst₂ {Γ,Δ = Γ,Δ} {τ′ = τ′} i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ =
-  Cat (subst₂ i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
-      (subst₁ z≤n
-              (congᶜ (shift≤-wkn₂-comm-≤ Γ,Δ z≤n i≤m τ′) Δ++Γ,∙⊢e₂∶τ₂)
-              Γ,Δ⊢e′∶τ′)
-      τ₁⊛τ₂
-subst₂ i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ = Vee (subst₂ i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′) (subst₂ i≤m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′) τ₁#τ₂
-
-soundness : ∀ {n} {Γ,Δ : Context n} {e τ} → Γ,Δ ⊢ e ∶ τ → ∀ γ → PW.Pointwise _⊨_ γ (toVec Γ,Δ) → ⟦ e ⟧ γ ⊨ τ
-soundness Eps γ γ⊨Γ,Δ = ⊨-liftˡ ℓ (⊨-liftʳ ℓ ℓ (｛ε｝⊨τε))
-soundness (Char c) γ γ⊨Γ,Δ = ⊨-liftˡ ℓ (⊨-liftʳ ℓ ℓ (｛c｝⊨τ[c] c))
-soundness Bot γ γ⊨Γ,Δ = ⊨-liftˡ (c ⊔ ℓ) (⊨-liftʳ ℓ ℓ (∅⊨τ⊥))
-soundness {Γ,Δ = Γ,Δ} (Var {i = i} i≥m) γ γ⊨Γ,Δ = subst (⟦ Var i ⟧ γ ⊨_) (sym (τ≡τ′ Γ,Δ i≥m)) (PW.Pointwise.app γ⊨Γ,Δ i)
-  where
-  τ≡τ′ : ∀ {n i} (Γ,Δ : Context n) i≥m → lookup (Context.Γ Γ,Δ) (reduce≥′ {i = i} (Context.m≤n Γ,Δ) i≥m) ≡ lookup (toVec Γ,Δ) i
-  τ≡τ′ {.(suc _)} record { m = .0 ; m≤n = z≤n ; Γ = (x ∷ Γ) ; Δ = [] } i≥m = refl
-  τ≡τ′ {.(suc _)} {suc i} record { m = .(suc _) ; m≤n = (s≤s m≤n) ; Γ = Γ ; Δ = (x ∷ Δ) } (s≤s i≥m) =
-    τ≡τ′ (record { m≤n = m≤n ; Γ = Γ ; Δ = Δ}) i≥m
-soundness (Fix {e = e} Γ,Δ⊢e∶τ) γ γ⊨Γ,Δ =
-  ⋃-⊨ (λ L≤L′ → mono e (PW.extensional⇒inductive (PW.ext (λ { F.zero → L≤L′ ; (suc _) → ≤-refl }))))
-      (λ {L} L⊨τ → soundness Γ,Δ⊢e∶τ (L ∷ γ) (PW.ext (λ { zero → L⊨τ ; (suc i) → PW.Pointwise.app γ⊨Γ,Δ i })))
-soundness {Γ,Δ = Γ,Δ} (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) γ γ⊨Γ,Δ =
-  ∙-⊨ (soundness Γ,Δ⊢e₁∶τ₁ γ γ⊨Γ,Δ)
-      (soundness Δ++Γ,∙⊢e₂∶τ₂ γ (subst (PW.Pointwise _⊨_ γ) (sym (shift≤-toVec Γ,Δ z≤n)) γ⊨Γ,Δ))
-      τ₁⊛τ₂
-soundness (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) γ γ⊨Γ,Δ =
-  ∪-⊨ (soundness Γ,Δ⊢e₁∶τ₁ γ γ⊨Γ,Δ)
-      (soundness Γ,Δ⊢e₂∶τ₂ γ γ⊨Γ,Δ)
-      τ₁#τ₂
-
-subst-preserves-rank : ∀ {n} {Γ,Δ : Context n} {e τ i τ′} (i≤m : toℕ i ℕ.≤ _) →
-  C.wkn₂ Γ,Δ i≤m τ′ ⊢ e ∶ τ →
-  ∀ {e′} → shift Γ,Δ ⊢ e′ ∶ τ′ →
-  rank (e [ e′ / i ]) ≡ rank e
-subst-preserves-rank i≤m Eps Γ,Δ⊢e′∶τ′ = refl
-subst-preserves-rank i≤m (Char c) Γ,Δ⊢e′∶τ′ = refl
-subst-preserves-rank i≤m Bot Γ,Δ⊢e′∶τ′ = refl
-subst-preserves-rank {i = i} i≤m (Var {i = j} j>m) Γ,Δ⊢e′∶τ′ with i F.≟ j
-... | yes refl = ⊥-elim (<⇒≱ j>m i≤m)
-... | no i≢j = refl
-subst-preserves-rank {Γ,Δ = Γ,Δ} {τ = τ} {τ′ = τ′} i≤m (Fix Γ,Δ⊢e∶τ) Γ,Δ⊢e′∶τ′ =
-  cong suc (subst-preserves-rank {Γ,Δ = cons Γ,Δ τ} (s≤s i≤m)
-    (congᶜ (≋ᶜ-sym (wkn₂-comm Γ,Δ z≤n i≤m τ τ′)) Γ,Δ⊢e∶τ)
-    (congᶜ (≋ᶜ-sym (shift≤-wkn₂-comm-≤ Γ,Δ z≤n z≤n τ)) (wkn₁ Γ,Δ⊢e′∶τ′ z≤n τ)))
-subst-preserves-rank i≤m (Cat Γ,Δ⊢e₁∶τ₁ Δ++Γ,∙⊢e₂∶τ₂ τ₁⊛τ₂) Γ,Δ⊢e′∶τ′ =
-  cong suc (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
-subst-preserves-rank i≤m (Vee Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e₂∶τ₂ τ₁#τ₂) Γ,Δ⊢e′∶τ′ =
-  cong₂ (λ x y → suc (x ℕ.+ y))
-        (subst-preserves-rank i≤m Γ,Δ⊢e₁∶τ₁ Γ,Δ⊢e′∶τ′)
-        (subst-preserves-rank i≤m Γ,Δ⊢e₂∶τ₂ Γ,Δ⊢e′∶τ′)
+subst₂-pres-rank :
+  ∀ {e} → ctx ⊢ e ∶ τ →
+  ∀ i {e′} → shiftᶜ (remove₂ ctx i) zero ⊢ e′ ∶ lookup (Γ,Δ ctx) (inject!< i) →
+  rank (e [ e′ / inject!< i ]) ≡ rank e
+subst₂-pres-rank Eps      i ctx⊢e′∶τ′ = refl
+subst₂-pres-rank (Char c) i ctx⊢e′∶τ′ = refl
+subst₂-pres-rank Bot      i ctx⊢e′∶τ′ = refl
+subst₂-pres-rank {ctx = _ ⊐ g} (Var j)  i ctx⊢e′∶τ′ with inject!< i ≟ raise!> j
+... | yes i≡j = ⊥-elim (flip <⇒≢ (cong toℕ i≡j) (begin-strict
+  toℕ (inject!< i) ≡⟨ toℕ-inject!< i ⟩
+  toℕ< i           <⟨ toℕ<<i i ⟩
+  toℕ g            ≤⟨ toℕ>≥i j ⟩
+  toℕ> j           ≡˘⟨ toℕ-raise!> j ⟩
+  toℕ (raise!> j)  ∎))
+  where open ≤-Reasoning
+... | no i≢j  = refl
+subst₂-pres-rank {ctx = ctx @ (Γ,Δ ⊐ suc g)} {τ} (Fix ctx⊢e∶τ) i {e′} ctx⊢e′∶τ′ =
+  cong suc
+    (subst₂-pres-rank ctx⊢e∶τ (suc i)
+      (subst
+        (_⊢ wkn e′ zero ∶ lookup Γ,Δ (inject!< i))
+        (begin
+          wkn₁ᶜ (shiftᶜ (remove₂ ctx i) zero) zero τ       ≡˘⟨ shift-wkn₁-wkn₂-comm (remove₂ ctx i) zero zero τ ⟩
+          shiftᶜ (wkn₂ᶜ (remove₂ ctx i) zero τ) zero       ≡˘⟨ shift-cong-≡ zero zero (remove₂-wkn₂-comm ctx i zero τ) ⟩
+          shiftᶜ (remove₂ (wkn₂ᶜ ctx zero τ) (suc i)) zero ∎)
+        (wkn₁ ctx⊢e′∶τ′ zero τ)))
+  where open ≡-Reasoning
+subst₂-pres-rank (Cat ctx⊢e₁∶τ₁ _ _) i ctx⊢e′∶τ′ = cong suc (subst₂-pres-rank ctx⊢e₁∶τ₁ i ctx⊢e′∶τ′)
+subst₂-pres-rank (Vee ctx⊢e₁∶τ₁ ctx⊢e₂∶τ₂ _) i ctx⊢e′∶τ′ =
+  cong₂
+    (ℕ.suc ∘₂ _+_)
+    (subst₂-pres-rank ctx⊢e₁∶τ₁ i ctx⊢e′∶τ′)
+    (subst₂-pres-rank ctx⊢e₂∶τ₂ i ctx⊢e′∶τ′)
