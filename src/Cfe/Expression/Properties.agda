@@ -39,14 +39,18 @@ open import Data.List using (List; length; _++_)
 open import Data.List.Properties using (length-++)
 open import Data.List.Relation.Binary.Pointwise using (Pointwise-length)
 open import Data.Nat hiding (_≟_; _⊔_; _^_)
+open import Data.Nat.Induction using (<-wellFounded)
 open import Data.Nat.Properties hiding (_≟_)
 open import Data.Product
+open import Data.Product.Relation.Binary.Lex.Strict using (×-wellFounded)
 open import Data.Sum using (_⊎_; inj₁; inj₂)
 open import Data.Vec hiding (length; _++_)
 open import Data.Vec.Properties
 open import Data.Vec.Relation.Binary.Pointwise.Inductive as PW
   hiding (refl; sym; trans; setoid; lookup)
+open import Induction.WellFounded using (WellFounded)
 open import Level using (_⊔_)
+open import Relation.Binary.Construct.On using () renaming (wellFounded to on-wellFounded)
 open import Relation.Binary.PropositionalEquality hiding (setoid)
 open import Relation.Nullary
 
@@ -154,6 +158,16 @@ _<ₗₑₓ_ : REL (List C × Expression m) (List C × Expression n) _
 <ₗₑₓ-asym (inj₂ (_ , r₁<r₂))      (inj₂ (_ , r₂<r₁))    = <ᵣₐₙₖ-asym r₁<r₂ r₂<r₁
 
 ------------------------------------------------------------------------
+-- Induction properties
+
+<ᵣₐₙₖ-wellFounded : WellFounded (_<ᵣₐₙₖ_ {n})
+<ᵣₐₙₖ-wellFounded = on-wellFounded rank <-wellFounded
+
+<ₗₑₓ-wellFounded : WellFounded (_<ₗₑₓ_ {n})
+<ₗₑₓ-wellFounded = on-wellFounded (map₁ length) (×-wellFounded <-wellFounded <ᵣₐₙₖ-wellFounded)
+
+
+------------------------------------------------------------------------
 -- Other properties
 
 rank-∨ˡ : ∀ (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∨ e₂
@@ -175,6 +189,23 @@ rank-∨ʳ e₁ e₂ = begin-strict
 rank-∙ˡ : ∀ (e₁ e₂ : Expression n) → e₁ <ᵣₐₙₖ e₁ ∙ e₂
 rank-∙ˡ e₁ _ = n<1+n (rank e₁)
 
+lex-∙ˡ :
+  ∀ (e₁ e₂ : Expression n) γ →
+  ∀ {w} → (w∈⟦e₁∙e₂⟧ : w ∈ ⟦ e₁ ∙ e₂ ⟧ γ) →
+  let w₁ = proj₁ w∈⟦e₁∙e₂⟧ in
+  (w₁ , e₁) <ₗₑₓ (w , e₁ ∙ e₂)
+lex-∙ˡ e₁ e₂ γ {w} (w₁ , w₂ , w₁∈⟦e₁⟧ , w₂∈⟦e₂⟧ , eq) with m≤n⇒m<n∨m≡n ∣w₁∣≤∣w∣
+  where
+  open ≤-Reasoning
+  ∣w₁∣≤∣w∣ : length w₁ ≤ length w
+  ∣w₁∣≤∣w∣ = begin
+    length w₁             ≤⟨ m≤m+n (length w₁) (length w₂) ⟩
+    length w₁ + length w₂ ≡˘⟨ length-++ w₁ ⟩
+    length (w₁ ++ w₂)     ≡⟨ Pointwise-length eq ⟩
+    length w              ∎
+... | inj₁ ∣w₁∣<∣w∣ = inj₁ ∣w₁∣<∣w∣
+... | inj₂ ∣w₁∣≡∣w∣ = inj₂ (∣w₁∣≡∣w∣ , rank-∙ˡ e₁ e₂)
+
 lex-∙ʳ :
   ∀ (e₁ e₂ : Expression n) γ → ¬ Null (⟦ e₁ ⟧ γ) →
   ∀ {w} → (w∈⟦e₁∙e₂⟧ : w ∈ ⟦ e₁ ∙ e₂ ⟧ γ) →
@@ -182,14 +213,13 @@ lex-∙ʳ :
   (w₂ , e₂) <ₗₑₓ (w , e₁ ∙ e₂)
 lex-∙ʳ e₁ _ γ ε∉⟦e₁⟧ {w} (w₁ , w₂ , w₁∈⟦e₁⟧ , w₂∈⟦e₂⟧ , eq) with m≤n⇒m<n∨m≡n ∣w₂∣≤∣w∣
   where
+  open ≤-Reasoning
   ∣w₂∣≤∣w∣ : length w₂ ≤ length w
   ∣w₂∣≤∣w∣ = begin
     length w₂             ≤⟨ m≤n+m (length w₂) (length w₁) ⟩
     length w₁ + length w₂ ≡˘⟨ length-++ w₁ ⟩
     length (w₁ ++ w₂)     ≡⟨ Pointwise-length eq ⟩
     length w              ∎
-    where
-    open ≤-Reasoning
 ... | inj₁ ∣w₂∣<∣w∣ = inj₁ ∣w₂∣<∣w∣
 ... | inj₂ ∣w₂∣≡∣w∣ = ⊥-elim (ε∉⟦e₁⟧ (∣w∣≡0+w∈A⇒ε∈A {A = ⟦ e₁ ⟧ γ} ∣w₁∣≡0 w₁∈⟦e₁⟧))
   where

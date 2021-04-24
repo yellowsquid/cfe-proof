@@ -850,6 +850,12 @@ Fⁿ⊆⋃F = FⁿA⊆SupFA
 ⋃-inverseʳ : ∀ (A : Language a) → ⋃ (const A) ≈ A
 ⋃-inverseʳ _ = ⊆-antisym (sub λ {(ℕ.suc _ , w∈A) → w∈A}) (Fⁿ⊆⋃F 1)
 
+⋃-unroll : (∀ {A B} → A ⊆ B → F A ⊆ F B) → ⋃ F ⊆ F (⋃ F)
+⋃-unroll {F = F} mono-ext = ∀[Fⁿ⊆B]⇒⋃F⊆B λ
+  { ℕ.zero    → ⊆-min (F (⋃ F))
+  ; (ℕ.suc n) → mono-ext (Fⁿ⊆⋃F n)
+  }
+
 ------------------------------------------------------------------------
 -- Other properties of Null
 ------------------------------------------------------------------------
