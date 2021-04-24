@@ -13,7 +13,7 @@ open import Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁)
 open import Data.Nat using (ℕ; suc; _∸_; _+_)
 open import Data.Nat.Properties using (+-suc)
 open import Data.Product using (_×_)
-open import Data.Vec using (Vec; []; insert)
+open import Data.Vec using (Vec; []; insert; remove)
 open import Data.Vec.Relation.Binary.Pointwise.Inductive using (Pointwise)
 open import Level renaming (suc to lsuc)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; module ≡-Reasoning)
@@ -43,16 +43,25 @@ open Context public
 -- Insertions
 
 wkn₂ : ∀ (ctx : Context n) → Fin< (1+ guard ctx) → Type ℓ ℓ → Context (suc n)
-wkn₂ (Γ,Δ ⊐ g) i τ = insert Γ,Δ (inject<! i) τ ⊐ 1+ g
+wkn₂ (Γ,Δ ⊐ g) i τ = insert Γ,Δ (inject!< i) τ ⊐ 1+ g
 
-wkn₁ : ∀ (ctx : Context n) → Fin> (guard ctx) → Type ℓ ℓ → Context (suc n)
-wkn₁ (Γ,Δ ⊐ g) i τ = insert Γ,Δ (raise> i) τ ⊐ inject₁ g
+wkn₁ : ∀ (ctx : Context n) → Fin> (inject₁ (guard ctx)) → Type ℓ ℓ → Context (suc n)
+wkn₁ (Γ,Δ ⊐ g) i τ = insert Γ,Δ (raise!> i) τ ⊐ inject₁ g
 
 ------------------------------------------------------------------------
 -- Modifications
 
 shift : ∀ (ctx : Context n) → Fin< (1+ guard ctx) → Context n
-shift (Γ,Δ ⊐ _) i = Γ,Δ ⊐ inject<! i
+shift (Γ,Δ ⊐ _) i = Γ,Δ ⊐ inject!< i
+
+------------------------------------------------------------------------
+-- Deletions
+
+remove₂ : ∀ (ctx : Context (suc n)) → Fin< (guard ctx) → Context n
+remove₂ (Γ,Δ ⊐ g) i = remove Γ,Δ (inject!< i) ⊐ predⁱ< i
+
+remove₁ : ∀ (ctx : Context (suc n)) → Fin> (guard ctx) → Context n
+remove₁ (Γ,Δ ⊐ g) i = remove Γ,Δ (raise!> i) ⊐ inject₁ⁱ> i
 
 ------------------------------------------------------------------------
 -- Relations
