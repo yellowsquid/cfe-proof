@@ -16,7 +16,6 @@ open Setoid over using ()
   )
 
 open import Algebra
-open import Cfe.Function.Power
 open import Cfe.Language over
   hiding
   ( _≉_; ≈-refl; ≈-trans; ≈-isPartialEquivalence; ≈-isEquivalence; partialSetoid; setoid
@@ -356,18 +355,19 @@ setoid {fℓ} {lℓ} = record { isEquivalence = ≈-isEquivalence {fℓ} {lℓ} 
   ; l⇒l = λ (x , w , (m , xw∈Fᵐ) , w′ , n , xwcw′∈Fⁿ) →
     Fⁿ⊨τ.l⇒l
       (m + n)
-      (-, -, ∈-resp-⊆ (step (m≤m+n m n)) xw∈Fᵐ , -, ∈-resp-⊆ (step (m≤n+m n m)) xwcw′∈Fⁿ)
+      ( x
+      , w
+      , ∈-resp-⊆ (Iter-monoʳ mono (⊆-min (F ∅)) (m≤m+n m n)) xw∈Fᵐ
+      , w′
+      , ∈-resp-⊆ (Iter-monoʳ mono (⊆-min (F ∅)) (m≤n+m n m)) xwcw′∈Fⁿ
+      )
   }
   where
-  Fⁿ⊨τ : ∀ n → (F ^ n) ∅ ⊨ τ
+  Fⁿ⊨τ : ∀ n → Iter F ∅ n ⊨ τ
   Fⁿ⊨τ zero    = ⊨-min τ
   Fⁿ⊨τ (suc n) = ⊨-step (Fⁿ⊨τ n)
 
   module Fⁿ⊨τ n = _⊨_ (Fⁿ⊨τ n)
-
-  step : ∀ {m n} → m ≤ⁿ n → (F ^ m) ∅ ⊆ (F ^ n) ∅
-  step {n = n} z≤n       = ⊆-min ((F  ^ n) ∅)
-  step         (s≤s m≤n) = mono (step m≤n)
 
 ------------------------------------------------------------------------
 -- Properties of _⊛_

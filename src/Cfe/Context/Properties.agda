@@ -20,6 +20,7 @@ open import Cfe.Type over using ()
   ; ≤-trans to ≤ᵗ-trans
   ; ≤-antisym to ≤ᵗ-antisym
   )
+open import Cfe.Vec.Relation.Binary.Pointwise.Inductive
 open import Data.Fin hiding (pred; _≟_) renaming (_≤_ to _≤ᶠ_)
 open import Data.Fin.Properties using (toℕ<n; toℕ-injective; toℕ-inject₁)
   renaming
@@ -45,33 +46,6 @@ open import Relation.Nullary.Decidable using (True; toWitness; fromWitness)
 private
   variable
     n : ℕ
-
-------------------------------------------------------------------------
--- Properties for Pointwise
-------------------------------------------------------------------------
-
-  pw-antisym :
-    ∀ {a b ℓ} {A : Set a} {B : Set b} {P : REL A B ℓ} {Q : REL B A ℓ} {R : REL A B ℓ} {m n} →
-    Antisym P Q R → Antisym (Pointwise P {m} {n}) (Pointwise Q) (Pointwise R)
-  pw-antisym antisym []       []       = []
-  pw-antisym antisym (x ∷ xs) (y ∷ ys) = antisym x y ∷ pw-antisym antisym xs ys
-
-  pw-insert :
-    ∀ {a b ℓ} {A : Set a} {B : Set b} {_∼_ : REL A B ℓ} {m n} {xs : Vec A m} {ys : Vec B n} →
-    ∀ i j {i≡j : True (toℕ i ≟ toℕ j)} {x y} →
-    x ∼ y → Pointwise _∼_ xs ys → Pointwise _∼_ (insert xs i x) (insert ys j y)
-  pw-insert zero    zero          x xs       = x ∷ xs
-  pw-insert (suc i) (suc j) {i≡j} x (y ∷ xs) =
-    y ∷ pw-insert i j {i≡j |> toWitness |> cong pred |> fromWitness} x xs
-
-  pw-remove :
-    ∀ {a b ℓ} {A : Set a} {B : Set b} {_∼_ : REL A B ℓ} →
-    ∀ {m n} {xs : Vec A (suc m)} {ys : Vec B (suc n)} →
-    ∀ i j {i≡j : True (toℕ i ≟ toℕ j)} →
-    Pointwise _∼_ xs ys → Pointwise _∼_ (remove xs i) (remove ys j)
-  pw-remove zero zero (_ ∷ xs) = xs
-  pw-remove (suc i) (suc j) {i≡j} (x ∷ y ∷ xs) =
-    x ∷ pw-remove i j {i≡j |> toWitness |> cong pred |> fromWitness} (y ∷ xs)
 
 ------------------------------------------------------------------------
 -- Properties of _≈_
@@ -126,7 +100,7 @@ setoid {n} = record { isEquivalence = ≈-isEquivalence {n} }
 ≤-trans = zip (flip ≤ᶠ-trans) (Pw.trans ≤ᵗ-trans)
 
 ≤-antisym : Antisymmetric (_≈_ {n}) _≤_
-≤-antisym = zip (sym ∘₂ ≤ᶠ-antisym) (pw-antisym ≤ᵗ-antisym)
+≤-antisym = zip (sym ∘₂ ≤ᶠ-antisym) (antisym ≤ᵗ-antisym)
 
 ------------------------------------------------------------------------
 -- Structures
@@ -162,7 +136,7 @@ wkn₂-mono :
   τ₁ ≤ᵗ τ₂ → ctx₁ ≤ ctx₂ → wkn₂ {n} ctx₁ i τ₁ ≤ wkn₂ ctx₂ j τ₂
 wkn₂-mono i j {i≡j} τ₁≤τ₂ (g₂≤g₁ , Γ,Δ₁≤Γ,Δ₂) =
   s≤s g₂≤g₁ ,
-  pw-insert
+  Pointwise-insert
     (inject!< i) (inject!< j)
     {i≡j |> toWitness |> inject!<-cong |> fromWitness}
     τ₁≤τ₂
@@ -205,7 +179,7 @@ wkn₁-mono {_} {_ ⊐ g₁} {_ ⊐ g₂} i j {i≡j} τ₁≤τ₂ (g₂≤g₁
     toℕ g₂           ≤⟨ g₂≤g₁ ⟩
     toℕ g₁           ≡˘⟨ toℕ-inject₁ g₁ ⟩
     toℕ (inject₁ g₁) ∎) ,
-  pw-insert
+  Pointwise-insert
     (raise!> i) (raise!> j)
     {i≡j |> toWitness |> raise!>-cong |> fromWitness}
     τ₁≤τ₂
@@ -318,7 +292,11 @@ remove₂-mono :
   ctx₁ ≤ ctx₂ → remove₂ {n} ctx₁ i ≤ remove₂ ctx₂ j
 remove₂-mono i j {i≡j} (g₂≤g₁ , Γ,Δ₁≤Γ,Δ₂) =
   predⁱ<-mono j i g₂≤g₁ ,
-  pw-remove (inject!< i) (inject!< j) {i≡j |> toWitness |> inject!<-cong |> fromWitness} Γ,Δ₁≤Γ,Δ₂
+  Pointwise-remove
+    (inject!< i)
+    (inject!< j)
+    {i≡j |> toWitness |> inject!<-cong |> fromWitness}
+    Γ,Δ₁≤Γ,Δ₂
 
 remove₂-cong :
   ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ< i ≟ toℕ< j)} →
@@ -356,7 +334,11 @@ remove₁-mono :
   ctx₁ ≤ ctx₂ → remove₁ {n} ctx₁ i ≤ remove₁ ctx₂ j
 remove₁-mono i j {i≡j} (g₂≤g₁ , Γ,Δ₁≤Γ,Δ₂) =
   inject₁ⁱ>-mono j i g₂≤g₁ ,
-  pw-remove (raise!> i) (raise!> j) {i≡j |> toWitness |> raise!>-cong |> fromWitness} Γ,Δ₁≤Γ,Δ₂
+  Pointwise-remove
+    (raise!> i)
+    (raise!> j)
+    {i≡j |> toWitness |> raise!>-cong |> fromWitness}
+    Γ,Δ₁≤Γ,Δ₂
 
 remove₁-cong :
   ∀ {ctx₁ ctx₂} i j {i≡j : True (toℕ> i ≟ toℕ> j)} →

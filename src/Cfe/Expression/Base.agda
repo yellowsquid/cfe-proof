@@ -46,7 +46,7 @@ infix 4 _≈_
 ⟦ Char x ⟧  _ = ｛ x ｝
 ⟦ e₁ ∨ e₂ ⟧ γ = ⟦ e₁ ⟧ γ ∪ ⟦ e₂ ⟧ γ
 ⟦ e₁ ∙ e₂ ⟧ γ = ⟦ e₁ ⟧ γ ∙ˡ ⟦ e₂ ⟧ γ
-⟦ Var n ⟧   γ = lookup γ n
+⟦ Var j ⟧   γ = lookup γ j
 ⟦ μ e ⟧     γ = ⋃ (λ X → ⟦ e ⟧ (X ∷ γ))
 
 _≈_ : {n : ℕ} → Expression n → Expression n → Set _

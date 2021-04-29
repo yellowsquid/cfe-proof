@@ -16,7 +16,6 @@ open Setoid over using ()
     )
 
 open import Algebra
-open import Cfe.Function.Power
 open import Cfe.Language.Base over
 open import Cfe.List.Compare over
 open import Data.Empty using (⊥-elim)
@@ -25,11 +24,11 @@ open import Data.List as L
 open import Data.List.Properties
 open import Data.List.Relation.Binary.Equality.Setoid over
 import Data.List.Relation.Unary.Any as Any
-import Data.Nat as ℕ
+open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
 open import Data.Product as P
 open import Data.Sum as S
 open import Function hiding (_⟶_)
-open import Level
+open import Level renaming (suc to ℓsuc)
 import Relation.Binary.Construct.On as On
 open import Relation.Binary.PropositionalEquality hiding (setoid; [_])
 open import Relation.Nullary hiding (Irrelevant)
@@ -82,6 +81,12 @@ First-resp-∼ A c∼c′ (w , cw∈A) = w , ∈-resp-≋ (c∼c′ ∷ ≋-refl
 ⊆-min : Min (_⊆_ {a} {b}) ∅
 ⊆-min _ = sub λ ()
 
+⊆-respʳ-≈ : Y ≈ Z → X ⊆ Y → X ⊆ Z
+⊆-respʳ-≈ Y≈Z X⊆Y = ⊆-trans X⊆Y (⊆-reflexive Y≈Z)
+
+⊆-respˡ-≈ : Y ≈ Z → Y ⊆ X → Z ⊆ X
+⊆-respˡ-≈ Y≈Z Y⊆X = ⊆-trans (⊇-reflexive Y≈Z) Y⊆X
+
 ------------------------------------------------------------------------
 -- Membership properties of _⊆_
 
@@ -107,6 +112,9 @@ Flast-resp-⊆ (sub A⊆B) = P.map₂ (P.map₂ (P.map A⊆B (P.map₂ A⊆B)))
 
 ≈-refl : Reflexive (_≈_ {a})
 ≈-refl = ⊆-refl , ⊆-refl
+
+≈-reflexive : _≡_ ⇒ (_≈_ {a})
+≈-reflexive refl = ≈-refl
 
 ≈-sym : Sym (_≈_ {a} {b}) _≈_
 ≈-sym = P.swap
@@ -157,6 +165,93 @@ setoid {a} = record { isEquivalence = ≈-isEquivalence {a} }
 
 ⊆-poset : ∀ {a} → Poset _ _ _
 ⊆-poset {a} = record { isPartialOrder = ⊆-isPartialOrder {a} }
+
+-- Shamelessly adapted from Relation.Binary.Reasoning.Base.Double
+module ⊆-Reasoning where
+  infix 4 _IsRelatedTo_
+
+  data _IsRelatedTo_ (A : Language a) (B : Language b) : Set (c ⊔ ℓ ⊔ ℓsuc (a ⊔ b)) where
+    nonstrict : (A⊆B : A ⊆ B) → A IsRelatedTo B
+    equals    : (A≈B : A ≈ B) → A IsRelatedTo B
+
+  ------------------------------------------------------------------------
+  -- A record that is used to ensure that the final relation proved by the
+  -- chain of reasoning can be converted into the required relation.
+
+  data IsEquality {A : Language a} {B : Language b} : A IsRelatedTo B → Set (c ⊔ ℓ ⊔ ℓsuc (a ⊔ b)) where
+    isEquality : ∀ A≈B → IsEquality (equals A≈B)
+
+  IsEquality? : ∀ (A⊆B : A IsRelatedTo B) → Dec (IsEquality A⊆B)
+  IsEquality? (nonstrict _) = no λ()
+  IsEquality? (equals A≈B)  = yes (isEquality A≈B)
+
+  extractEquality : ∀ {A⊆B : A IsRelatedTo B} → IsEquality A⊆B → A ≈ B
+  extractEquality (isEquality A≈B) = A≈B
+
+  ------------------------------------------------------------------------
+  -- Reasoning combinators
+
+  -- See `Relation.Binary.Reasoning.Base.Partial` for the design decisions
+  -- behind these combinators.
+
+  infix  1 begin_ begin-equality_
+  infixr 2 step-⊆ step-≈ step-≈˘ step-≡ step-≡˘ _≡⟨⟩_
+  infix  3 _∎
+
+  -- Beginnings of various types of proofs
+
+  begin_ : (r : A IsRelatedTo B) → A ⊆ B
+  begin (nonstrict A⊆B) = A⊆B
+  begin (equals    A≈B) = ⊆-reflexive A≈B
+
+  begin-equality_ : ∀ (r : A IsRelatedTo B) → {s : True (IsEquality? r)} → A ≈ B
+  begin-equality_ r {s} = extractEquality (toWitness s)
+
+  -- Step with the main relation
+
+  step-⊆ : ∀ (X : Language a) → Y IsRelatedTo Z → X ⊆ Y → X IsRelatedTo Z
+  step-⊆ X (nonstrict Y⊆Z) X⊆Y = nonstrict (⊆-trans X⊆Y Y⊆Z)
+  step-⊆ X (equals    Y≈Z) X⊆Y = nonstrict (⊆-respʳ-≈ Y≈Z X⊆Y)
+
+  -- Step with the setoid equality
+
+  step-≈ : ∀ (X : Language a) → Y IsRelatedTo Z → X ≈ Y → X IsRelatedTo Z
+  step-≈ X (nonstrict Y⊆Z) X≈Y = nonstrict (⊆-respˡ-≈ (≈-sym X≈Y) Y⊆Z)
+  step-≈ X (equals    Y≈Z) X≈Y = equals    (≈-trans X≈Y Y≈Z)
+
+  -- Flipped step with the setoid equality
+
+  step-≈˘ : ∀ (X : Language a) → Y IsRelatedTo Z → Y ≈ X → X IsRelatedTo Z
+  step-≈˘ X Y⊆Z Y≈X = step-≈ X Y⊆Z (≈-sym Y≈X)
+
+  -- Step with non-trivial propositional equality
+
+  step-≡ : ∀ (X : Language a) → Y IsRelatedTo Z → X ≡ Y → X IsRelatedTo Z
+  step-≡ X (nonstrict Y⊆Z) X≡Y = nonstrict (case X≡Y of λ { refl → Y⊆Z })
+  step-≡ X (equals    Y≈Z) X≡Y = equals    (case X≡Y of λ { refl → Y≈Z })
+
+  -- Flipped step with non-trivial propositional equality
+
+  step-≡˘ : ∀ (X : Language a) → Y IsRelatedTo Z → Y ≡ X → X IsRelatedTo Z
+  step-≡˘ X Y⊆Z Y≡X = step-≡ X Y⊆Z (sym Y≡X)
+
+  -- Step with trivial propositional equality
+
+  _≡⟨⟩_ : ∀ (X : Language a) → X IsRelatedTo Y → X IsRelatedTo Y
+  X ≡⟨⟩ X⊆Y = X⊆Y
+
+  -- Termination step
+
+  _∎ : ∀ (X : Language a) → X IsRelatedTo X
+  X ∎ = equals ≈-refl
+
+  -- Syntax declarations
+
+  syntax step-⊆  X Y⊆Z X⊆Y = X ⊆⟨  X⊆Y ⟩ Y⊆Z
+  syntax step-≈  X Y⊆Z X≈Y = X ≈⟨  X≈Y ⟩ Y⊆Z
+  syntax step-≈˘ X Y⊆Z Y≈X = X ≈˘⟨ Y≈X ⟩ Y⊆Z
+  syntax step-≡  X Y⊆Z X≡Y = X ≡⟨  X≡Y ⟩ Y⊆Z
+  syntax step-≡˘ X Y⊆Z Y≡X = X ≡˘⟨ Y≡X ⟩ Y⊆Z
 
 ------------------------------------------------------------------------
 -- Membership properties of _≈_
@@ -797,26 +892,57 @@ _∪?_ : Decidable A → Decidable B → Decidable (A ∪ B)
 (A? ∪? B?) w = A? w ⊎-dec B? w
 
 ------------------------------------------------------------------------
+-- Properties of Iter
+------------------------------------------------------------------------
+-- Membership properties of Iter
+
+FⁿFA≡Fⁿ⁺¹A : ∀ n → Iter {a} F (F A) n ≡ Iter F A (suc n)
+FⁿFA≡Fⁿ⁺¹A         zero    = refl
+FⁿFA≡Fⁿ⁺¹A {F = F} (suc n) = cong F (FⁿFA≡Fⁿ⁺¹A n)
+
+Iter-monoˡ : (∀ {A B} → A ⊆ B → F A ⊆ G B) → ∀ n → A ⊆ B → Iter F A n ⊆ Iter G B n
+Iter-monoˡ mono zero    A⊆B = A⊆B
+Iter-monoˡ mono (suc n) A⊆B = mono (Iter-monoˡ mono n A⊆B)
+
+Iter-congˡ : (∀ {A B} → A ≈ B → F A ≈ G B) → ∀ n → A ≈ B → Iter F A n ≈ Iter G B n
+Iter-congˡ cong zero    A≈B = A≈B
+Iter-congˡ cong (suc n) A≈B = cong (Iter-congˡ cong n A≈B)
+
+Iter-step : (∀ {A B} → A ⊆ B → F A ⊆ F B) → A ⊆ F A → ∀ n → Iter F A n ⊆ Iter F A (suc n)
+Iter-step mono A⊆FA zero    = A⊆FA
+Iter-step mono A⊆FA (suc n) = mono (Iter-step mono A⊆FA n)
+
+Iter-monoʳ : (∀ {A B} → A ⊆ B → F A ⊆ F B) → A ⊆ F A → ∀ {m n} → m ≤ n → Iter F A m ⊆ Iter F A n
+Iter-monoʳ                 mono A⊆FA {n = zero}  z≤n       = ⊆-refl
+Iter-monoʳ {F = F} {A = A} mono A⊆FA {n = suc n} z≤n       = begin
+  A              ⊆⟨ A⊆FA ⟩
+  F A            ⊆⟨ mono (Iter-monoʳ mono A⊆FA {n = n} z≤n) ⟩
+  F (Iter F A n) ∎
+  where open ⊆-Reasoning
+Iter-monoʳ                 mono A⊆FA             (s≤s m≤n) = mono (Iter-monoʳ mono A⊆FA m≤n)
+
+------------------------------------------------------------------------
 -- Properties of Sup
 ------------------------------------------------------------------------
 -- Membership properties of Sup
 
-FⁿA⊆SupFA : ∀ n → (F ^ n) A ⊆ Sup F A
+FⁿA⊆SupFA : ∀ n → Iter F A n ⊆ Sup F A
 FⁿA⊆SupFA n = sub (n ,_)
 
-FⁿFA⊆SupFA : ∀ n → (F ^ n) (F A) ⊆ Sup F A
-FⁿFA⊆SupFA {F = F} {A = A} n = ⊆-trans (sub (go n)) (FⁿA⊆SupFA (ℕ.suc n))
-  where
-  go : ∀ {w} n → w ∈ (F ^ n) (F A) → w ∈ (F ^ (ℕ.suc n)) A
-  go {w = w} n w∈Fⁿ̂FA = subst (λ x → w ∈ x A) (fⁿf≡fⁿ⁺¹ F n) w∈Fⁿ̂FA
+FⁿFA⊆SupFA : ∀ n → Iter F (F A) n ⊆ Sup F A
+FⁿFA⊆SupFA {F = F} {A = A} n = begin
+  Iter F (F A) n   ≡⟨ FⁿFA≡Fⁿ⁺¹A n ⟩
+  Iter F A (suc n) ⊆⟨ FⁿA⊆SupFA (suc n) ⟩
+  Sup F A          ∎
+  where open ⊆-Reasoning
 
-∀[FⁿA⊆B]⇒SupFA⊆B : (∀ n → (F ^ n) A ⊆ B) → Sup F A ⊆ B
+∀[FⁿA⊆B]⇒SupFA⊆B : (∀ n → Iter F A n ⊆ B) → Sup F A ⊆ B
 ∀[FⁿA⊆B]⇒SupFA⊆B FⁿA⊆B = sub λ (n , w∈FⁿA) → ∈-resp-⊆ (FⁿA⊆B n) w∈FⁿA
 
-∃[B⊆FⁿA]⇒B⊆SupFA : ∀ n → B ⊆ (F ^ n) A → B ⊆ Sup F A
+∃[B⊆FⁿA]⇒B⊆SupFA : ∀ n → B ⊆ Iter F A n → B ⊆ Sup F A
 ∃[B⊆FⁿA]⇒B⊆SupFA n B⊆FⁿA = sub λ w∈B → n , ∈-resp-⊆ B⊆FⁿA w∈B
 
-∀[FⁿA≈GⁿB]⇒SupFA≈SupGB : (∀ n → (F ^ n) A ≈ (G ^ n) B) → Sup F A ≈ Sup G B
+∀[FⁿA≈GⁿB]⇒SupFA≈SupGB : (∀ n → Iter F A n ≈ Iter G B n) → Sup F A ≈ Sup G B
 ∀[FⁿA≈GⁿB]⇒SupFA≈SupGB FⁿA≈GⁿB =
   ⊆-antisym
     (sub λ (n , w∈FⁿA) → n , ∈-resp-≈ (FⁿA≈GⁿB n) w∈FⁿA)
@@ -826,34 +952,38 @@ FⁿFA⊆SupFA {F = F} {A = A} n = ⊆-trans (sub (go n)) (FⁿA⊆SupFA (ℕ.su
 ------------------------------------------------------------------------
 -- Membership properties of ⋃_
 
-Fⁿ⊆⋃F : ∀ n → (F ^ n) ∅ ⊆ ⋃ F
+Fⁿ⊆⋃F : ∀ n → Iter F ∅ n ⊆ ⋃ F
 Fⁿ⊆⋃F = FⁿA⊆SupFA
 
-∀[Fⁿ⊆B]⇒⋃F⊆B : (∀ n → (F ^ n) ∅ ⊆ B) → ⋃ F ⊆ B
+∀[Fⁿ⊆B]⇒⋃F⊆B : (∀ n → Iter F ∅ n ⊆ B) → ⋃ F ⊆ B
 ∀[Fⁿ⊆B]⇒⋃F⊆B = ∀[FⁿA⊆B]⇒SupFA⊆B
 
-∃[B⊆Fⁿ]⇒B⊆⋃F : ∀ n → B ⊆ (F ^ n) ∅ → B ⊆ ⋃ F
+∃[B⊆Fⁿ]⇒B⊆⋃F : ∀ n → B ⊆ Iter F ∅ n → B ⊆ ⋃ F
 ∃[B⊆Fⁿ]⇒B⊆⋃F = ∃[B⊆FⁿA]⇒B⊆SupFA
 
-∀[Fⁿ≈Gⁿ]⇒⋃F≈⋃G : (∀ n → (F ^ n) ∅ ≈ (G ^ n) ∅) → ⋃ F ≈ ⋃ G
+∀[Fⁿ≈Gⁿ]⇒⋃F≈⋃G : (∀ n → Iter F ∅ n ≈ Iter G ∅ n) → ⋃ F ≈ ⋃ G
 ∀[Fⁿ≈Gⁿ]⇒⋃F≈⋃G = ∀[FⁿA≈GⁿB]⇒SupFA≈SupGB
 
 ------------------------------------------------------------------------
 -- Functional properties of ⋃_
 
 ⋃-mono : (∀ {A B} → A ⊆ B → F A ⊆ G B) → ⋃ F ⊆ ⋃ G
-⋃-mono mono-ext = ∀[Fⁿ⊆B]⇒⋃F⊆B λ n → ⊆-trans (f∼g⇒fⁿ∼gⁿ _⊆_ (⊆-min ∅) mono-ext n) (Fⁿ⊆⋃F n)
+⋃-mono {F = F} {G = G} mono-ext = ∀[Fⁿ⊆B]⇒⋃F⊆B λ n → (begin
+  Iter F ∅ n ⊆⟨ Iter-monoˡ mono-ext n (⊆-min ∅) ⟩
+  Iter G ∅ n ⊆⟨ Fⁿ⊆⋃F n ⟩
+  ⋃ G        ∎)
+  where open ⊆-Reasoning
 
 ⋃-cong : (∀ {A B} → A ≈ B → F A ≈ G B) → ⋃ F ≈ ⋃ G
-⋃-cong ext = ∀[Fⁿ≈Gⁿ]⇒⋃F≈⋃G (f∼g⇒fⁿ∼gⁿ _≈_ (⊆-antisym (⊆-min ∅) (⊆-min ∅)) ext)
+⋃-cong ext = ∀[Fⁿ≈Gⁿ]⇒⋃F≈⋃G λ n → Iter-congˡ ext n (⊆-antisym (⊆-min ∅) (⊆-min ∅))
 
 ⋃-inverseʳ : ∀ (A : Language a) → ⋃ (const A) ≈ A
-⋃-inverseʳ _ = ⊆-antisym (sub λ {(ℕ.suc _ , w∈A) → w∈A}) (Fⁿ⊆⋃F 1)
+⋃-inverseʳ _ = ⊆-antisym (sub λ {(suc _ , w∈A) → w∈A}) (Fⁿ⊆⋃F 1)
 
 ⋃-unroll : (∀ {A B} → A ⊆ B → F A ⊆ F B) → ⋃ F ⊆ F (⋃ F)
 ⋃-unroll {F = F} mono-ext = ∀[Fⁿ⊆B]⇒⋃F⊆B λ
-  { ℕ.zero    → ⊆-min (F (⋃ F))
-  ; (ℕ.suc n) → mono-ext (Fⁿ⊆⋃F n)
+  { zero    → ⊆-min (F (⋃ F))
+  ; (suc n) → mono-ext (Fⁿ⊆⋃F n)
   }
 
 ------------------------------------------------------------------------

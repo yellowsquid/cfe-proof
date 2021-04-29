@@ -8,14 +8,14 @@ module Cfe.Language.Base
 
 open Setoid over using () renaming (Carrier to C)
 
-open import Cfe.Function.Power
 open import Data.Empty.Polymorphic using (⊥)
 open import Data.List
 open import Data.List.Relation.Binary.Equality.Setoid over
+open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product
 open import Data.Sum
 open import Function
-open import Level
+open import Level renaming (suc to ℓsuc)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Relation.Nullary using (Dec; ¬_)
 
@@ -26,7 +26,7 @@ private
 ------------------------------------------------------------------------
 -- Definition
 
-record Language a : Set (c ⊔ ℓ ⊔ suc a) where
+record Language a : Set (c ⊔ ℓ ⊔ ℓsuc a) where
   field
     𝕃        : List C → Set a
     ∈-resp-≋ : 𝕃 ⟶ 𝕃 Respects _≋_
@@ -82,11 +82,16 @@ A ∪ B = record
   ; ∈-resp-≋ = uncurry Data.Sum.map ∘ < Language.∈-resp-≋ A , Language.∈-resp-≋ B >
   }
 
+Iter : (Language a → Language a) → Language a → ℕ → Language _
+Iter F A zero    = A
+Iter F A (suc n) = F (Iter F A n)
+
 Sup : (Language a → Language a) → Language a → Language _
 Sup F A = record
-  { 𝕃        = λ w → ∃[ n ] w ∈ (F ^ n) A
-  ; ∈-resp-≋ = λ w≋w′ (n , w∈FⁿA) → n , Language.∈-resp-≋ ((F ^ n) A) w≋w′ w∈FⁿA
+  { 𝕃        = λ w → ∃[ n ] w ∈ Iter F A n
+  ; ∈-resp-≋ = λ w≋w′ (n , w∈FⁿA) → n , Iter.∈-resp-≋ F A n w≋w′ w∈FⁿA
   }
+  where module Iter F A n = Language (Iter F A n)
 
 ⋃_ : (Language a → Language a) → Language _
 ⋃ F = Sup F ∅
@@ -96,7 +101,7 @@ Sup F A = record
 
 infix 4 _⊆_ _≈_
 
-data _⊆_ {a b} : REL (Language a) (Language b) (c ⊔ ℓ ⊔ suc (a ⊔ b)) where
+data _⊆_ {a b} : REL (Language a) (Language b) (c ⊔ ℓ ⊔ ℓsuc (a ⊔ b)) where
   sub : ∀ {A : Language a} {B : Language b} → (∀ {w} → w ∈ A → w ∈ B) → A ⊆ B
 
 _⊇_ : REL (Language a) (Language b) _
